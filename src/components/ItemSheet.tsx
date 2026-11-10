@@ -1,0 +1,444 @@
+import { ExternalLink, Trash2, Users } from 'lucide-react'
+import { useId, useState } from 'react'
+import { useAuth } from '@/auth/AuthProvider'
+import {
+  OWNERSHIP_LABEL,
+  PRIORITIES,
+  PRIORITY_LABEL,
+  STATUSES,
+  STATUS_LABEL,
+  type Item,
+  type Ownership,
+  type Priority,
+  type Responsibility,
+  type Status,
+} from '@/lib/domain'
+import { useHousehold, type ItemPatch } from '@/household/HouseholdProvider'
+import { Avatar } from './Avatar'
+import { ConfirmSheet, Sheet } from './Sheet'
+import { useToast } from './Toast'
+import { Button, Field, Segmented } from './ui'
+
+interface ItemSheetProps {
+  open: boolean
+  onClose: () => void
+  /** Existing item to edit, or null to create. */
+  item: Item | null
+  /** Default room when creating. */
+  roomId?: string
+}
+
+interface Draft {
+  name: string
+  description: string
+  room_id: string
+  priority: Priority
+  status: Status
+  responsibility: Responsibility
+  responsible_user_id: string | null
+  ownership: Ownership
+  owner_user_id: string | null
+  is_complete: boolean
+  estimated_price: string
+  actual_price: string
+  shopping_url: string
+  notes: string
+}
+
+function toDraft(item: Item | null, roomId: string): Draft {
+  return {
+    name: item?.name ?? '',
+    description: item?.description ?? '',
+    room_id: item?.room_id ?? roomId,
+    priority: item?.priority ?? 'must_have',
+    status: item?.status ?? 'to_decide',
+    responsibility: item?.responsibility ?? 'unclaimed',
+    responsible_user_id: item?.responsible_user_id ?? null,
+    ownership: item?.ownership ?? 'to_decide',
+    owner_user_id: item?.owner_user_id ?? null,
+    is_complete: item?.is_complete ?? false,
+    estimated_price: item?.estimated_price != null ? String(item.estimated_price) : '',
+    actual_price: item?.actual_price != null ? String(item.actual_price) : '',
+    shopping_url: item?.shopping_url ?? '',
+    notes: item?.notes ?? '',
+  }
+}
+
+function parseMoney(v: string): number | null | 'invalid' {
+  const t = v.trim().replace(/^\$/, '').replace(/,/g, '')
+  if (t === '') return null
+  const n = Number(t)
+  if (!Number.isFinite(n) || n < 0 || n > 99_999_999) return 'invalid'
+  return Math.round(n * 100) / 100
+}
+
+function normaliseUrl(v: string): string | null | 'invalid' {
+  const t = v.trim()
+  if (t === '') return null
+  const withScheme = /^https?:\/\//i.test(t) ? t : `https://${t}`
+  try {
+    const u = new URL(withScheme)
+    if (!u.hostname.includes('.')) return 'invalid'
+    return u.toString()
+  } catch {
+    return 'invalid'
+  }
+}
+
+export function ItemSheet({ open, onClose, item, roomId }: ItemSheetProps) {
+  return (
+    <Sheet open={open} onClose={onClose} title={item ? 'Item details' : 'Add an item'}>
+      {open && <ItemForm key={item?.id ?? 'new'} item={item} roomId={roomId} onDone={onClose} />}
+    </Sheet>
+  )
+}
+
+function ItemForm({ item, roomId, onDone }: { item: Item | null; roomId?: string; onDone: () => void }) {
+  const { user } = useAuth()
+  const { rooms, members, createItem, updateItem, deleteItem } = useHousehold()
+  const toast = useToast()
+  const ids = { name: useId(), desc: useId(), room: useId(), owner: useId(), est: useId(), act: useId(), url: useId(), notes: useId() }
+  const [draft, setDraft] = useState<Draft>(() => toDraft(item, roomId ?? rooms[0]?.id ?? ''))
+  const [errors, setErrors] = useState<Partial<Record<keyof Draft, string>>>({})
+  const [saving, setSaving] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }))
+
+  const setResponsible = (value: string) => {
+    if (value === 'unclaimed' || value === 'shared') {
+      setDraft((d) => ({ ...d, responsibility: value, responsible_user_id: null }))
+    } else {
+      setDraft((d) => ({ ...d, responsibility: 'member', responsible_user_id: value }))
+    }
+  }
+  const responsibleValue = draft.responsibility === 'member' ? (draft.responsible_user_id ?? 'unclaimed') : draft.responsibility
+
+  const ownerValue = draft.ownership === 'member' ? `member:${draft.owner_user_id}` : draft.ownership
+  const setOwner = (value: string) => {
+    if (value.startsWith('member:')) setDraft((d) => ({ ...d, ownership: 'member', owner_user_id: value.slice(7) }))
+    else setDraft((d) => ({ ...d, ownership: value as Ownership, owner_user_id: null }))
+  }
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const errs: typeof errors = {}
+    const name = draft.name.trim()
+    if (!name) errs.name = 'Give it a name.'
+    else if (name.length > 80) errs.name = 'Keep it under 80 characters.'
+    if (!draft.room_id) errs.room_id = 'Choose a room.'
+    const est = parseMoney(draft.estimated_price)
+    const act = parseMoney(draft.actual_price)
+    if (est === 'invalid') errs.estimated_price = 'Enter a number, like 120 or 49.95.'
+    if (act === 'invalid') errs.actual_price = 'Enter a number, like 120 or 49.95.'
+    const url = normaliseUrl(draft.shopping_url)
+    if (url === 'invalid') errs.shopping_url = 'That doesn’t look like a web link.'
+    setErrors(errs)
+    if (Object.keys(errs).length > 0) return
+
+    const payload: ItemPatch & { name: string; room_id: string } = {
+      name,
+      description: draft.description.trim() || null,
+      room_id: draft.room_id,
+      priority: draft.priority,
+      status: draft.status,
+      responsibility: draft.responsibility,
+      responsible_user_id: draft.responsible_user_id,
+      ownership: draft.ownership,
+      owner_user_id: draft.owner_user_id,
+      is_complete: draft.is_complete,
+      estimated_price: est as number | null,
+      actual_price: act as number | null,
+      shopping_url: url as string | null,
+      notes: draft.notes.trim() || null,
+    }
+    setSaving(true)
+    const res = item ? await updateItem(item.id, payload) : await createItem(payload)
+    setSaving(false)
+    if (!res.ok) {
+      toast.error(res.error)
+      return
+    }
+    toast.success(item ? 'Saved' : `Added “${name}”`)
+    onDone()
+  }
+
+  const remove = async () => {
+    if (!item) return
+    setDeleting(true)
+    const res = await deleteItem(item.id)
+    setDeleting(false)
+    setConfirmDelete(false)
+    if (!res.ok) {
+      toast.error(res.error)
+      return
+    }
+    toast.show(`Removed “${item.name}”`)
+    onDone()
+  }
+
+  return (
+    <form onSubmit={save} className="flex flex-col gap-6 pt-2" noValidate>
+      <Field label="Item" htmlFor={ids.name} error={errors.name}>
+        <input
+          id={ids.name}
+          className="field text-[17px] font-semibold"
+          value={draft.name}
+          onChange={(e) => set('name', e.target.value)}
+          placeholder="e.g. Coffee table"
+          maxLength={80}
+          autoComplete="off"
+          aria-invalid={!!errors.name}
+          data-autofocus={item ? undefined : true}
+        />
+      </Field>
+
+      <label className="bg-surface-2 flex min-h-14 cursor-pointer items-center justify-between gap-3 rounded-[var(--radius-control)] px-4">
+        <span>
+          <span className="block font-semibold">It’s in the flat</span>
+          <span className="text-ink-2 block text-[14px]">Tick only once it’s physically here</span>
+        </span>
+        <Switch checked={draft.is_complete} onChange={(v) => set('is_complete', v)} label="It’s in the flat" />
+      </label>
+
+      <fieldset>
+        <legend className="mb-2 text-[14px] font-semibold">Who’s on it?</legend>
+        <div className="no-scrollbar -mx-5 flex gap-1 overflow-x-auto px-4" role="radiogroup" aria-label="Who’s on it?">
+          <PersonChoice selected={responsibleValue === 'unclaimed'} onClick={() => setResponsible('unclaimed')} label="Unclaimed">
+            <span className="text-ink-2 border-ink-3 flex h-12 w-12 items-center justify-center rounded-full border-2 border-dashed text-[13px] font-bold">
+              ?
+            </span>
+          </PersonChoice>
+          {members.map((m) => (
+            <PersonChoice
+              key={m.userId}
+              selected={responsibleValue === m.userId}
+              onClick={() => setResponsible(m.userId)}
+              label={m.userId === user?.id ? 'Me' : m.profile.display_name}
+            >
+              <Avatar profile={m.profile} size={48} decorative />
+            </PersonChoice>
+          ))}
+          <PersonChoice selected={responsibleValue === 'shared'} onClick={() => setResponsible('shared')} label="Shared">
+            <span className="bg-surface-2 text-ink flex h-12 w-12 items-center justify-center rounded-full">
+              <Users size={22} aria-hidden />
+            </span>
+          </PersonChoice>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend className="mb-2 text-[14px] font-semibold">Plan</legend>
+        <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Plan">
+          {STATUSES.map((s) => {
+            const selected = draft.status === s
+            return (
+              <button
+                key={s}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => set('status', s)}
+                className={`pressable min-h-12 rounded-2xl px-3 text-left text-[15px] font-semibold transition-colors ${
+                  selected ? 'bg-ink text-white' : 'bg-surface-2 text-ink'
+                }`}
+              >
+                {STATUS_LABEL[s]}
+              </button>
+            )
+          })}
+        </div>
+        {draft.status === 'ordered' && !draft.is_complete && (
+          <p className="text-ink-2 mt-2 text-[14px]">Ordered items stay open until someone ticks them as in the flat.</p>
+        )}
+        {draft.status === 'not_needed' && (
+          <p className="text-ink-2 mt-2 text-[14px]">Not needed items don’t count towards progress.</p>
+        )}
+      </fieldset>
+
+      <div>
+        <p className="mb-2 text-[14px] font-semibold">Priority</p>
+        <Segmented
+          label="Priority"
+          value={draft.priority}
+          onChange={(v) => set('priority', v)}
+          options={PRIORITIES.map((p) => ({ value: p, label: PRIORITY_LABEL[p] }))}
+        />
+      </div>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="Room" htmlFor={ids.room} error={errors.room_id}>
+          <select id={ids.room} className="field appearance-none" value={draft.room_id} onChange={(e) => set('room_id', e.target.value)}>
+            {rooms.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Owned by" htmlFor={ids.owner} hint="Who keeps it if the flat moves on">
+          <select id={ids.owner} className="field appearance-none" value={ownerValue} onChange={(e) => setOwner(e.target.value)}>
+            <option value="to_decide">{OWNERSHIP_LABEL.to_decide}</option>
+            <option value="shared">{OWNERSHIP_LABEL.shared}</option>
+            {members.map((m) => (
+              <option key={m.userId} value={`member:${m.userId}`}>
+                {m.profile.display_name}
+              </option>
+            ))}
+            <option value="landlord">{OWNERSHIP_LABEL.landlord}</option>
+          </select>
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Estimate (NZ$)" htmlFor={ids.est} error={errors.estimated_price}>
+          <input
+            id={ids.est}
+            className="field tabular-nums"
+            inputMode="decimal"
+            placeholder="Optional"
+            value={draft.estimated_price}
+            onChange={(e) => set('estimated_price', e.target.value)}
+            aria-invalid={!!errors.estimated_price}
+          />
+        </Field>
+        <Field label="Spent (NZ$)" htmlFor={ids.act} error={errors.actual_price}>
+          <input
+            id={ids.act}
+            className="field tabular-nums"
+            inputMode="decimal"
+            placeholder="Optional"
+            value={draft.actual_price}
+            onChange={(e) => set('actual_price', e.target.value)}
+            aria-invalid={!!errors.actual_price}
+          />
+        </Field>
+      </div>
+
+      <Field label="Shopping link" htmlFor={ids.url} error={errors.shopping_url}>
+        <div className="flex gap-2">
+          <input
+            id={ids.url}
+            className="field"
+            type="url"
+            inputMode="url"
+            autoCapitalize="off"
+            placeholder="https://"
+            value={draft.shopping_url}
+            onChange={(e) => set('shopping_url', e.target.value)}
+            aria-invalid={!!errors.shopping_url}
+          />
+          {item?.shopping_url && (
+            <a
+              href={item.shopping_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="pressable bg-surface-2 inline-flex w-14 shrink-0 items-center justify-center rounded-[var(--radius-control)]"
+              aria-label="Open shopping link"
+            >
+              <ExternalLink size={20} aria-hidden />
+            </a>
+          )}
+        </div>
+      </Field>
+
+      <Field label="Details" htmlFor={ids.desc} hint="Size, colour, model…">
+        <input
+          id={ids.desc}
+          className="field"
+          value={draft.description}
+          onChange={(e) => set('description', e.target.value)}
+          maxLength={500}
+          placeholder="Optional"
+        />
+      </Field>
+
+      <Field label="Notes" htmlFor={ids.notes}>
+        <textarea
+          id={ids.notes}
+          className="field min-h-24 resize-y"
+          value={draft.notes}
+          onChange={(e) => set('notes', e.target.value)}
+          maxLength={1000}
+          placeholder="Anything the others should know"
+        />
+      </Field>
+
+      <div className="bg-surface sticky bottom-0 -mx-5 flex flex-col gap-2 px-5 pt-2 pb-1">
+        <Button type="submit" size="lg" block loading={saving}>
+          {item ? 'Save changes' : 'Add item'}
+        </Button>
+        {item && (
+          <Button type="button" variant="ghost" block icon={<Trash2 size={18} aria-hidden />} className="text-danger" onClick={() => setConfirmDelete(true)}>
+            Delete item
+          </Button>
+        )}
+      </div>
+
+      <ConfirmSheet
+        open={confirmDelete}
+        title="Delete this item?"
+        body={`“${item?.name ?? ''}” will be removed for everyone in the flat.`}
+        confirmLabel="Delete"
+        danger
+        busy={deleting}
+        onConfirm={remove}
+        onClose={() => setConfirmDelete(false)}
+      />
+    </form>
+  )
+}
+
+function PersonChoice({
+  selected,
+  onClick,
+  label,
+  children,
+}: {
+  selected: boolean
+  onClick: () => void
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={onClick}
+      className="pressable flex w-[72px] shrink-0 flex-col items-center gap-1.5 rounded-2xl py-1.5"
+    >
+      <span
+        className="rounded-full p-[3px] transition-[box-shadow] duration-200"
+        style={{ boxShadow: selected ? '0 0 0 2.5px var(--color-ink)' : '0 0 0 2.5px transparent' }}
+      >
+        {children}
+      </span>
+      <span className={`w-full truncate text-center text-[13px] ${selected ? 'text-ink font-bold' : 'text-ink-2 font-medium'}`}>
+        {label}
+      </span>
+    </button>
+  )
+}
+
+export function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={(e) => {
+        e.preventDefault()
+        onChange(!checked)
+      }}
+      className={`relative inline-flex h-8 w-[52px] shrink-0 items-center rounded-full transition-colors duration-200 ${checked ? 'bg-green' : 'bg-surface-3'}`}
+    >
+      <span
+        className="bg-surface absolute top-1 left-1 h-6 w-6 rounded-full transition-transform duration-200"
+        style={{ transform: checked ? 'translateX(20px)' : 'translateX(0)' }}
+      />
+    </button>
+  )
+}

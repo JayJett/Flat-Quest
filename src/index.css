@@ -1,0 +1,147 @@
+@import '@fontsource-variable/plus-jakarta-sans';
+@import 'tailwindcss';
+
+/*
+ * Flat Quest design tokens.
+ * Predominantly white, crisp black type, selective saturated colour.
+ * No shadows except --shadow-float for genuinely floating layers.
+ */
+@theme {
+  --font-sans: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  --color-surface: #ffffff;
+  --color-surface-2: #f5f5f6;
+  --color-surface-3: #ececef;
+  --color-ink: #111111;
+  /* #858585 from the brief is 3.7:1 on white; this keeps the tone at 4.7:1 (AA). */
+  --color-ink-2: #737378;
+  /* Non-essential only (placeholders, disabled). */
+  --color-ink-3: #a3a3a8;
+  --color-line: #e7e7ea;
+
+  --color-accent: #3657e8;
+  --color-accent-press: #2945c9;
+  --color-accent-soft: #eef1fd;
+  --color-periwinkle: #8585f5;
+  --color-periwinkle-ink: #5b5bd6;
+  --color-green: #42c493;
+  --color-green-ink: #16855c;
+  --color-green-soft: #e8f8f1;
+  --color-orange-ink: #c2410c;
+  --color-danger: #c9302c;
+  --color-danger-soft: #fdeeee;
+
+  --radius-tile: 28px;
+  --radius-card: 22px;
+  --radius-control: 16px;
+
+  --shadow-float: 0 18px 50px -12px rgb(17 17 17 / 0.22);
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --text-display: 2.125rem;
+  --text-display--line-height: 1.1;
+  --text-display--letter-spacing: -0.025em;
+  --text-title: 1.375rem;
+  --text-title--line-height: 1.2;
+  --text-title--letter-spacing: -0.015em;
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+    -webkit-tap-highlight-color: transparent;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --bottom-nav-h: 64px;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    @apply bg-surface text-ink font-sans antialiased;
+    font-size: 16px;
+    line-height: 1.5;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+    overscroll-behavior-y: none;
+  }
+
+  /* Accessible, visible focus for keyboard users only. */
+  :focus-visible {
+    outline: 2.5px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 10px;
+  }
+
+  button {
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  input,
+  textarea,
+  select {
+    font: inherit;
+    /* 16px prevents iOS zoom-on-focus. */
+    font-size: 16px;
+  }
+
+  ::selection {
+    background: var(--color-accent-soft);
+  }
+}
+
+@layer components {
+  .pressable {
+    transition:
+      transform 160ms var(--ease-out-soft),
+      background-color 160ms ease,
+      opacity 160ms ease;
+  }
+  .pressable:active {
+    transform: scale(0.97);
+  }
+
+  .field {
+    @apply bg-surface-2 text-ink placeholder:text-ink-3 w-full rounded-[var(--radius-control)] px-4 py-3.5 outline-none;
+    border: 1.5px solid transparent;
+    transition:
+      border-color 150ms ease,
+      background-color 150ms ease;
+  }
+  .field:focus {
+    @apply bg-surface;
+    border-color: var(--color-accent);
+  }
+  .field[aria-invalid='true'] {
+    border-color: var(--color-danger);
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .pressable:active {
+    transform: none;
+  }
+}
