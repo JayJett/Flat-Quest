@@ -2,11 +2,17 @@
 
 These are the only steps that need you. Everything else (the code, the database, the security rules and the checklist data) is already done.
 
-You'll need about **20 minutes** and a computer with a web browser. Do the parts **in order**.
+You'll need about **10 minutes** and a computer with a web browser. Do the parts **in order**.
+
+Your app's web address will be:
+
+**https://jayjett.github.io/Flat-Quest/**
+
+It's hosted the same way as Moni Money, on GitHub Pages, so there are no new accounts to create.
 
 | Part | What it does | Needed? |
 | --- | --- | --- |
-| 1 | Put the app on the internet (Vercel) | **Yes** |
+| 1 | Switch on GitHub Pages for Flat-Quest | **Yes** |
 | 2 | Tell Supabase the app's web address | **Yes** |
 | 3 | Make sign-up instant (skip email confirmation) | Recommended |
 | 4 | Create your flat and invite everyone | **Yes** |
@@ -14,52 +20,50 @@ You'll need about **20 minutes** and a computer with a web browser. Do the parts
 | 6 | Add "Continue with Google" | Optional, can do later |
 
 Words you'll see:
-- **GitHub** is where the app's code is stored. You already have it: `JayJett/Flat-Quest`. You don't need to change anything there.
-- **Vercel** is a free service that takes the code from GitHub and runs it as a website.
+- **GitHub** is where the app's code is stored (`JayJett/Flat-Quest`), and also what hosts the website.
 - **Supabase** is the database and login system. Your project there is called **flat-quest**.
 
----
+### Why is this different from Moni Money?
 
-## Part 1: Put the app on the internet (Vercel)
+Moni Money is written as plain web pages, so GitHub can show its files directly.
 
-1. Go to **https://vercel.com/signup**.
-2. Choose **Hobby** (the free plan), type your name, and click **Continue**.
-3. Click **Continue with GitHub**. Log in to GitHub if asked, then click **Authorize Vercel**.
-4. You'll land on a page that says something like **"Let's build something new"**. (If you don't, click **Add New…** in the top-right, then **Project**.)
-5. Under **Import Git Repository** you'll see a list of your GitHub repositories.
-   - If **Flat-Quest** is in the list, click **Import** next to it.
-   - If it is **not** in the list:
-     1. Click **Adjust GitHub App Permissions** (or **Install** / **Configure GitHub App**). A GitHub window opens.
-     2. Under **Repository access**, choose **All repositories**, or choose **Only select repositories** and pick **Flat-Quest**.
-     3. Click **Save** (or **Install**), go back to Vercel, and click **Import** next to Flat-Quest.
-6. On the **Configure Project** screen:
-   - **Project Name:** type `flat-quest` (or leave what's there).
-   - **Framework Preset:** it should say **Vite**. If not, pick Vite from the list.
-   - Leave everything else alone. You do **not** need to add environment variables; they're already in the code.
-7. Click **Deploy**. Wait about one minute until you see confetti and **"Congratulations!"**.
-8. Click **Continue to Dashboard**. Under **Domains** you'll see your app's address, something like `flat-quest-xxxx.vercel.app`.
-   - **Write this address down exactly.** You need it in Part 2 and Part 6.
-   - In the rest of this guide it's called **YOUR-APP-ADDRESS**. Example: if Vercel shows `flat-quest-abc.vercel.app`, then YOUR-APP-ADDRESS is `https://flat-quest-abc.vercel.app`.
-
-From now on, whenever new code is pushed to GitHub, Vercel updates the website automatically.
+Flat Quest is written in a format that has to be **built** (converted into web pages) first. I've added an automatic GitHub robot (a "GitHub Actions workflow") that does that build every time the code changes and publishes the result. The only difference for you is one setting in Part 1: telling GitHub to publish what the robot builds instead of the raw files.
 
 ---
 
-## Part 2: Tell Supabase the app's address
+## Part 1: Switch on GitHub Pages (2 minutes)
+
+1. Go to **https://github.com/JayJett/Flat-Quest** and sign in if asked.
+2. Near the top of the page, click **Settings** (the gear icon, on the right of the row that starts with **Code**).
+3. In the left-hand menu, under **Code and automation**, click **Pages**.
+4. Under **Build and deployment**, find **Source** and change it to **GitHub Actions**. (It may say "Deploy from a branch" right now.)
+   - It saves by itself; there's no Save button.
+5. Now start the first build:
+   1. Click **Actions** in the top row of tabs.
+   2. In the left list, click **Build and publish to GitHub Pages**.
+   3. Click the **Run workflow** button on the right, then the green **Run workflow** button in the box that appears.
+6. Wait about 2 minutes. Refresh the page; when the run shows a **green tick** ✅, the app is live at **https://jayjett.github.io/Flat-Quest/**.
+   - A red ❌ means something failed: click it and send Claude a screenshot.
+
+From now on, every time Claude pushes new code, GitHub rebuilds and republishes the app automatically.
+
+---
+
+## Part 2: Tell Supabase the app's address (2 minutes)
 
 Without this step, sign-up and password-reset emails would send people to the wrong place.
 
 1. Go to **https://supabase.com/dashboard** and sign in.
-2. Click the project called **flat-quest**. (Not "my-budget"; that's your other app.)
-3. In the left-hand menu, click **Authentication** (the icon looks like a person or key; hover to see names).
+2. Click the project called **flat-quest**. (Not "my-budget"; that's Moni Money.)
+3. In the left-hand menu, click **Authentication** (hover over the icons to see their names).
 4. In the menu that appears, under **Configuration**, click **URL Configuration**.
 5. **Site URL:**
    1. Delete what's in the box (probably `http://localhost:3000`).
-   2. Paste YOUR-APP-ADDRESS, e.g. `https://flat-quest-abc.vercel.app`. No slash at the end.
+   2. Paste exactly: `https://jayjett.github.io/Flat-Quest`
    3. Click **Save changes**.
 6. **Redirect URLs:**
    1. Click **Add URL**.
-   2. Paste YOUR-APP-ADDRESS followed by `/**`, e.g. `https://flat-quest-abc.vercel.app/**`. Those are two stars.
+   2. Paste exactly: `https://jayjett.github.io/Flat-Quest/**` (two stars at the end).
    3. Click **Save URLs**.
 
 ---
@@ -84,7 +88,7 @@ Strangers still can't see anything. Without an invite link from someone in your 
 
 **Jarden (or whoever sets it up):**
 
-1. Open YOUR-APP-ADDRESS on your phone.
+1. Open **https://jayjett.github.io/Flat-Quest/** on your phone.
 2. Tap **Create an account**, enter your name, email and a password (8+ characters), and tap **Create account**.
    - If you skipped Part 3, check your email and tap the confirmation link first.
 3. Tap **Set up our flat**. The name **9 Rua Kai Wai** is already filled in.
@@ -137,7 +141,7 @@ Email sign-in works without this. The Google button stays hidden until this is s
 6. In the left menu, click **Clients**, then **Create client**:
    - **Application type:** **Web application**.
    - **Name:** `Flat Quest web`.
-   - **Authorized JavaScript origins:** click **Add URI** and paste YOUR-APP-ADDRESS (e.g. `https://flat-quest-abc.vercel.app`).
+   - **Authorized JavaScript origins:** click **Add URI** and paste exactly: `https://jayjett.github.io`
    - **Authorized redirect URIs:** click **Add URI** and paste exactly:
      `https://ivnovvdpkxrqsmsiqhid.supabase.co/auth/v1/callback`
    - Click **Create**.
@@ -153,7 +157,7 @@ Email sign-in works without this. The Google button stays hidden until this is s
 4. Paste the **Client ID** into **Client IDs**, and the **Client secret** into **Client Secret (for OAuth)**.
 5. Click **Save**.
 
-Reload YOUR-APP-ADDRESS: the **Continue with Google** button now appears on the sign-in screen.
+Reload https://jayjett.github.io/Flat-Quest/: the **Continue with Google** button now appears on the sign-in screen.
 
 ---
 
@@ -161,7 +165,8 @@ Reload YOUR-APP-ADDRESS: the **Continue with Google** button now appears on the 
 
 | What you see | What to do |
 | --- | --- |
-| Vercel says the build failed | Click the failed deployment, scroll to the red lines, and paste them to Claude. |
+| The GitHub Actions run has a red ❌ | Click it, click the failed step, and send Claude a screenshot. |
+| The address shows a GitHub "404" page | Part 1 step 4 isn't set to **GitHub Actions**, or the first run hasn't finished. |
 | Confirmation or reset email opens a "localhost" page | Part 2 isn't saved. Check the Site URL and Redirect URL, including the `/**`. |
 | "Email rate limit exceeded" | Do Part 3, or wait an hour. |
 | Google says **"Access blocked"** or **"redirect_uri_mismatch"** | In Google Cloud → Clients → your client, check the redirect URI exactly matches the one in step 6a.6, and that the person is listed under **Test users**. |

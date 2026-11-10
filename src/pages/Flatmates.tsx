@@ -15,6 +15,7 @@ import type { HouseholdInviteRow } from '@/lib/database.types'
 import { PRIORITY_RANK, type Item } from '@/lib/domain'
 import { countsTowardProgress, openItemsFor } from '@/lib/stats'
 import { errorMessage, supabase } from '@/lib/supabase'
+import { appUrl } from '@/lib/urls'
 import { useHousehold } from '@/household/HouseholdProvider'
 import { BackButton, goBack } from './RoomDetail'
 
@@ -130,7 +131,7 @@ function InviteContent() {
     const { data, error } = await supabase.rpc('create_household_invite', { p_household: household.id })
     setBusy(false)
     if (error || !data) return toast.error(errorMessage(error))
-    setLink(`${window.location.origin}/join?code=${encodeURIComponent(data)}`)
+    setLink(appUrl(`/join?code=${encodeURIComponent(data)}`))
     void loadInvites()
   }
 

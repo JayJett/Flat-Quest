@@ -6,6 +6,7 @@ import { NEXT_KEY, safeNext } from '@/auth/guards'
 import { Wordmark } from '@/components/Logo'
 import { Button, Field } from '@/components/ui'
 import { errorMessage, supabase, SUPABASE_KEY, SUPABASE_URL } from '@/lib/supabase'
+import { appUrl } from '@/lib/urls'
 
 type Mode = 'sign-in' | 'sign-up' | 'forgot'
 
@@ -63,7 +64,7 @@ export function SignInPage() {
 
   if (!loading && session) return <Navigate to={next} replace />
 
-  const callbackUrl = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+  const callbackUrl = appUrl(`/auth/callback?next=${encodeURIComponent(next)}`)
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -89,7 +90,7 @@ export function SignInPage() {
         if (!data.session) setSentTo({ email: trimmedEmail, kind: 'confirm' })
       } else {
         const { error: err } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
-          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent('/auth/reset')}`,
+          redirectTo: appUrl(`/auth/callback?next=${encodeURIComponent('/auth/reset')}`),
         })
         if (err) throw err
         setSentTo({ email: trimmedEmail, kind: 'reset' })

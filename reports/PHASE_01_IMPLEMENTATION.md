@@ -146,7 +146,7 @@ src/
 - **Design tokens** live in `src/index.css` (`@theme`) and `src/design/tokens.ts`. Rooms store a colour *key* and an icon *key* rather than raw values, so future themes can remap them.
 - **Extensibility hooks:** `profiles.preferences` and `households.settings` are JSONB columns for future appearance and branding options. Room colour and icon are already user-editable. Membership supports multiple households per user, with the active one remembered locally.
 - **PWA readiness:** web manifest, 192/512/maskable icons, Apple touch icon, `viewport-fit=cover` and safe-area handling. A service worker was deliberately left out (see J).
-- **Vercel:** `vercel.json` provides the SPA rewrite and security headers.
+- **Hosting:** GitHub Pages via a GitHub Actions workflow. The app supports a sub-folder base path, and `404.html` serves deep links. `vercel.json` is kept, so Vercel also works.
 
 ---
 
@@ -419,16 +419,22 @@ Screenshots are in `reports/screenshots/`. Mobile shots are iPhone 14 Pro (393 �
 
 ## K. Manual setup required
 
-Full click-by-click instructions, written for someone new to GitHub, Vercel and Supabase, are in **[`SETUP_GUIDE.md`](../SETUP_GUIDE.md)**. In summary:
+Full click-by-click instructions, written for someone new to GitHub and Supabase, are in **[`SETUP_GUIDE.md`](../SETUP_GUIDE.md)**.
 
-1. **Deploy on Vercel:** sign up with GitHub, import `JayJett/Flat-Quest`, click Deploy. No environment variables are needed: the public Supabase URL and *publishable* key are committed in `.env.production`. That key is browser-safe by design; data is protected by RLS.
-2. **Supabase → Authentication → URL Configuration:** Site URL = the Vercel address; Redirect URL = the Vercel address + `/**`.
+**Hosting changed from Vercel to GitHub Pages**, matching how Moni Money is hosted, so no new accounts are needed. The live address will be **https://jayjett.github.io/Flat-Quest/**. A GitHub Actions workflow (`.github/workflows/deploy.yml`) lints, tests, builds and publishes on every push to `main`. The app was adapted to run from that sub-folder (Vite `base`, router basename, `appUrl()` for auth redirects and invite links); 9 browser checks under `/Flat-Quest/` pass, including deep links, manifest and icons, the signed-out redirect, and the Google `redirect_to`.
+
+In summary:
+
+1. **GitHub → Flat-Quest → Settings → Pages → Source: GitHub Actions**, then run the workflow once. This needs repository admin rights, which I don't have.
+2. **Supabase → Authentication → URL Configuration:**
+   - Site URL `https://jayjett.github.io/Flat-Quest`
+   - Redirect URL `https://jayjett.github.io/Flat-Quest/**`
 3. **Recommended:** turn off **Confirm email**, which avoids Supabase's built-in email rate limit. Outsiders still can't see anything without an invite (verified by the RLS suite).
 4. **First use:** create the flat with the checklist on, then share an invite link.
 5. **After importing:** mark the three landlord appliances *Not needed / Landlord*.
-6. **Optional:** Google sign-in (Google Cloud OAuth client + Supabase Google provider).
+6. **Optional:** Google sign-in. Google OAuth client with JavaScript origin `https://jayjett.github.io` and redirect URI `https://ivnovvdpkxrqsmsiqhid.supabase.co/auth/v1/callback`, then enable the Supabase Google provider.
 
-These steps need the user's own browser logins. This environment has no Vercel connector, and its network blocks the Vercel, Supabase Management and Google Cloud APIs, so I could not do them.
+Steps 1, 2, 3 and 6 need your own logins. The available connectors can't change GitHub Pages settings or Supabase auth settings, and this environment's network blocks the Supabase Management and Google Cloud APIs.
 
 ---
 

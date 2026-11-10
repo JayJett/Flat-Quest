@@ -18,7 +18,7 @@ Mobile-first React web app backed by Supabase (Auth, Postgres with row level sec
 | Font | Plus Jakarta Sans (self-hosted via `@fontsource-variable`) |
 | Backend | Supabase: Auth (email + Google OAuth, PKCE), Postgres + RLS, Storage, Realtime |
 | Tests | Vitest (unit) |
-| Hosting | Any static host; `vercel.json` included for Vercel |
+| Hosting | GitHub Pages via GitHub Actions (Vercel-compatible too) |
 
 All dependency versions are pinned exactly in `package.json`; `package-lock.json` is committed.
 
@@ -36,7 +36,7 @@ Local development also needs a `.env` file:
 cp .env.example .env
 ```
 
-Fill it in with your Supabase project URL and **publishable** key (Project Settings → API Keys). Production builds read `.env.production`, which is committed and holds the same two public values, so Vercel needs no configuration. Never put the `service_role`/secret key in any `VITE_` variable or committed file: everything prefixed `VITE_` ships to the browser.
+Fill it in with your Supabase project URL and **publishable** key (Project Settings → API Keys). Production builds read `.env.production`, which is committed and holds the same two public values, so hosting needs no configuration. Never put the `service_role`/secret key in any `VITE_` variable or committed file: everything prefixed `VITE_` ships to the browser.
 
 ```bash
 npm run dev
@@ -69,10 +69,10 @@ The hosted project used in Phase 1 is `flat-quest` (`ivnovvdpkxrqsmsiqhid`, Sydn
 
 **Authentication → URL Configuration**
 
-- **Site URL:** your production URL, e.g. `https://flat-quest.vercel.app` (keep `http://localhost:3000` while developing).
+- **Site URL:** `https://jayjett.github.io/Flat-Quest`
 - **Redirect URLs:** add both
   - `http://localhost:3000/**`
-  - `https://<your-production-domain>/**`
+  - `https://jayjett.github.io/Flat-Quest/**`
 
 The app sends users back to `/auth/callback?next=…` after Google sign-in, email confirmation and password reset, so the `/**` wildcard is required.
 
@@ -87,17 +87,19 @@ The "Continue with Google" button only appears once the Google provider is enabl
 3. **Audience:** while the app is in *Testing*, add each flatmate's Google account as a test user (or publish the app).
 4. **Data Access:** scopes `openid`, `.../auth/userinfo.email`, `.../auth/userinfo.profile`.
 5. **Clients → Create client → Web application**
-   - Authorised JavaScript origins: `http://localhost:3000` and your production origin
+   - Authorised JavaScript origins: `http://localhost:3000` and `https://jayjett.github.io`
    - Authorised redirect URI: `https://ivnovvdpkxrqsmsiqhid.supabase.co/auth/v1/callback`
 6. Copy the Client ID and Client Secret into Supabase **Authentication → Sign In / Providers → Google**, and enable it.
 
-## Deploying to Vercel
+## Hosting (GitHub Pages)
 
-1. Import the GitHub repo into Vercel (framework preset: Vite).
-2. No environment variables are required (`.env.production` is committed). Set `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` in Vercel only if you point the app at a different Supabase project.
-3. Deploy, then add the production URL to Supabase's Site URL / Redirect URLs and to the Google OAuth client (above).
+The live app is **https://jayjett.github.io/Flat-Quest/**.
 
-`vercel.json` rewrites all app routes to `index.html` (client-side routing) and sets basic security headers.
+`.github/workflows/deploy.yml` runs on every push to `main`. It lints, runs the unit tests, builds with `BASE_PATH=/Flat-Quest/`, copies `index.html` to `404.html` so deep links work, and publishes `dist/` to GitHub Pages. One-time setup: repo **Settings → Pages → Source: GitHub Actions**.
+
+The app works from a sub-folder because Vite's `base` comes from `BASE_PATH`, the router uses `import.meta.env.BASE_URL` as its basename, and every absolute URL the app generates (auth redirects, invite links) goes through `appUrl()` in `src/lib/urls.ts`.
+
+Vercel also works (`vercel.json` is kept): import the repo and deploy with no settings. `BASE_PATH` defaults to `/`.
 
 ## How it works
 

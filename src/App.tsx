@@ -15,6 +15,7 @@ import { SettingsPage } from '@/pages/Settings'
 import { SignInPage } from '@/pages/SignIn'
 import { JoinPage, WelcomePage } from '@/pages/Welcome'
 import { WishlistPage } from '@/pages/Wishlist'
+import { BASE_PATH } from '@/lib/urls'
 
 function Providers() {
   return (
@@ -61,7 +62,7 @@ const router = createBrowserRouter([
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
-])
+], { basename: BASE_PATH || '/' })
 
 export default function App() {
   return <RouterProvider router={router} />
