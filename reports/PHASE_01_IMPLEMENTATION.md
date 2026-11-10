@@ -25,10 +25,10 @@ Phase 1 of Flat Quest is built: a mobile-first React web app on a new, dedicated
 **What is verified vs. not:**
 
 - **Verified:** lint, type-check, build and 28 unit tests pass. 39 scripted browser interaction checks pass against the production build. The schema, RLS, storage policies and RPCs are applied to the live project, and Supabase's security and performance advisors were reviewed.
+- **RLS / access isolation verified on the live database:** 44 checks across owner, joiner, outsider and anonymous roles, all passing (section H).
 - **Not yet verified:**
   - **Live sign-in from a browser.** This sandbox's network policy blocks `*.supabase.co`, so browser QA used intercepted fixture responses.
-  - **The RLS test suite.** It is written (45 checks, self-cleaning) but not yet run. The Supabase connector asked for your approval to create throwaway test users, and that prompt timed out.
-  - **Google OAuth.** It needs Google Cloud credentials that only you can create (section K).
+  - **Google OAuth.** It needs Google Cloud credentials that only you can create; step-by-step instructions are in `SETUP_GUIDE.md`.
 
 ---
 
@@ -345,14 +345,16 @@ These ran in Playwright against the production build at iPhone 14 Pro and 1280 p
 ### Database
 - All three migrations applied successfully via the Supabase connector.
 - Security and performance advisors reviewed; findings fixed or explained in section D.
-- **RLS suite: written, not yet run.** `supabase/tests/rls_verification.sql` impersonates three users (owner, joiner, outsider) plus anon and records 45 expected/actual checks:
-  - Household isolation; profile edit protection.
-  - Invite validation; no self-insertion into memberships.
-  - Token hashes unreadable; non-members can't be assigned.
-  - Cross-household moves blocked; server-set `completed_by`.
-  - Idempotent import; anon fully denied.
+- **RLS suite: run on the live database, 44/44 pass.** `supabase/tests/rls_verification.sql` impersonates three users (owner A, joiner B, outsider C) plus anon. Verified:
+  - **Isolation:** C sees none of A's items, rooms, invites or profile, and every write C attempts on A's data affects 0 rows or is rejected. B sees nothing before joining and everything after, but still can't see C's household.
+  - **Membership:** no direct insert into households or memberships; no self-promotion to owner; non-owners can't rename the household or remove others.
+  - **Invites:** bad codes rejected; preview works; joining twice is a no-op; token hashes unreadable.
+  - **Profiles:** only your own profile is editable; invalid colours rejected; avatar paths must be in your own folder.
+  - **Items:** non-members can't be assigned; items can't move households; `completed_by` is set by the database (a spoofed value is ignored); *Ordered* doesn't complete an item.
+  - **Import:** idempotent (re-import creates 0, skips 3); name matching assigns the right member.
+  - **anon:** fully denied.
 
-  It deletes everything it creates. My first run asked for your approval through the Supabase connector (it inserts test rows into `auth.users`), and that prompt timed out. **No RLS behaviour should be considered verified until this runs.**
+  History: the first version of the script failed with a Postgres syntax error (a data-modifying `WITH` inside a subquery). That was fixed by routing those queries through a helper function. On the first successful run, 43/44 passed; the one mismatch was a typo in the *expected* value (Postgres quotes names containing spaces), and the database behaviour was correct. The script cleans up after itself; I confirmed afterwards that 0 test users, households, items and profiles remain.
 
 ### Not tested
 - Live email and Google sign-in.
@@ -402,43 +404,31 @@ Screenshots are in `reports/screenshots/`. Mobile shots are iPhone 14 Pro (393 �
 
 ## J. Known issues and limitations
 
-1. **RLS suite not yet executed** (see H). This is the most important open item.
-2. **Live auth untested**, because the sandbox network can't reach Supabase. Email confirmation needs Redirect URLs set; Google needs configuration.
-3. **No service worker.** The app is installable to the home screen via the manifest, but there's no offline cache. I left it out because caching an authenticated SPA plus OAuth callback routes needs care; this is worth a deliberate Phase 2 task.
-4. **Bundle size:** 244 kB gzip in one chunk. Route-level code-splitting (Profile, Settings, auth pages) would cut first load.
-5. **Members can't be removed** by the owner from the UI. The policy only allows leaving, and there is no "leave household" button yet. If the owner leaves, nobody can rename the household.
-6. **Item reordering within a room** isn't exposed. Items are sorted by priority, name or plan, plus their import order.
-7. **Concurrent edits are last write wins**, at field level. Two people editing the same item sheet at once can overwrite each other's unsaved fields.
-8. **Realtime profile events** are delivered RLS-filtered but not filtered by household. The client ignores non-members. This is fine at this scale.
-9. **Custom accent colours** that are very light get dark text and icons automatically, but a very light accent can still look washed out as a tile or ring.
-10. `src/lib/database.types.ts` is a trimmed hand copy of the generated types. Regenerate it after schema changes.
-11. **Email rate limits:** Supabase's default sender is limited to a few emails per hour.
+1. **Live auth untested**, because the sandbox network can't reach Supabase. Email confirmation needs Redirect URLs set; Google needs configuration.
+2. **No service worker.** The app is installable to the home screen via the manifest, but there's no offline cache. I left it out because caching an authenticated SPA plus OAuth callback routes needs care; this is worth a deliberate Phase 2 task.
+3. **Bundle size:** 244 kB gzip in one chunk. Route-level code-splitting (Profile, Settings, auth pages) would cut first load.
+4. **Members can't be removed** by the owner from the UI. The policy only allows leaving, and there is no "leave household" button yet. If the owner leaves, nobody can rename the household.
+5. **Item reordering within a room** isn't exposed. Items are sorted by priority, name or plan, plus their import order.
+6. **Concurrent edits are last write wins**, at field level. Two people editing the same item sheet at once can overwrite each other's unsaved fields.
+7. **Realtime profile events** are delivered RLS-filtered but not filtered by household. The client ignores non-members. This is fine at this scale.
+8. **Custom accent colours** that are very light get dark text and icons automatically, but a very light accent can still look washed out as a tile or ring.
+9. `src/lib/database.types.ts` is a trimmed hand copy of the generated types. Regenerate it after schema changes.
+10. **Email rate limits:** Supabase's default sender is limited to a few emails per hour.
 
 ---
 
 ## K. Manual setup required
 
-1. **Environment variables** (local `.env` already contains these; add them in Vercel too):
-   - `VITE_SUPABASE_URL=https://ivnovvdpkxrqsmsiqhid.supabase.co`
-   - `VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_…` (from Supabase → Project Settings → API Keys)
-2. **Supabase → Authentication → URL Configuration:**
-   - Site URL: your production URL (until deployed, `http://localhost:3000`).
-   - Redirect URLs: `http://localhost:3000/**` and `https://<prod-domain>/**`.
-3. **Custom SMTP** (Authentication → Emails → SMTP), recommended before inviting everyone.
-4. **Google OAuth** (full steps in README):
-   1. Create a Web OAuth client in Google Cloud.
-   2. Authorised redirect URI: `https://ivnovvdpkxrqsmsiqhid.supabase.co/auth/v1/callback`.
-   3. JavaScript origins: localhost:3000 and the production origin.
-   4. Add the four flatmates as test users, or publish the consent screen.
-   5. Paste the Client ID and Secret into Supabase → Sign In / Providers → Google.
+Full click-by-click instructions, written for someone new to GitHub, Vercel and Supabase, are in **[`SETUP_GUIDE.md`](../SETUP_GUIDE.md)**. In summary:
 
-   The button appears automatically once enabled.
-5. **Deploy to Vercel:** import `JayJett/Flat-Quest`, choose the Vite preset, add the env vars, then add the domain to steps 2 and 4.
-6. **Run the RLS suite:** paste `supabase/tests/rls_verification.sql` into the SQL editor (or approve the connector prompt) and confirm all rows read PASS.
-7. **First use:**
-   1. Jarden signs up and creates "9 Rua Kai Wai" with the checklist on.
-   2. In Flatmates → Invite, create a link and share it with Madi, Emily and Dan.
-   3. Mark the landlord appliances *Not needed / Landlord*.
+1. **Deploy on Vercel:** sign up with GitHub, import `JayJett/Flat-Quest`, click Deploy. No environment variables are needed: the public Supabase URL and *publishable* key are committed in `.env.production`. That key is browser-safe by design; data is protected by RLS.
+2. **Supabase → Authentication → URL Configuration:** Site URL = the Vercel address; Redirect URL = the Vercel address + `/**`.
+3. **Recommended:** turn off **Confirm email**, which avoids Supabase's built-in email rate limit. Outsiders still can't see anything without an invite (verified by the RLS suite).
+4. **First use:** create the flat with the checklist on, then share an invite link.
+5. **After importing:** mark the three landlord appliances *Not needed / Landlord*.
+6. **Optional:** Google sign-in (Google Cloud OAuth client + Supabase Google provider).
+
+These steps need the user's own browser logins. This environment has no Vercel connector, and its network blocks the Vercel, Supabase Management and Google Cloud APIs, so I could not do them.
 
 ---
 

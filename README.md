@@ -4,6 +4,7 @@ A private, collaborative home-furnishing app for **9 Rua Kai Wai** (Brooklyn, We
 
 Mobile-first React web app backed by Supabase (Auth, Postgres with row level security, Storage, Realtime).
 
+> **New to this? Start with [`SETUP_GUIDE.md`](SETUP_GUIDE.md)**, which gives click-by-click setup instructions.
 > Phase 1 status and verification details: [`reports/PHASE_01_IMPLEMENTATION.md`](reports/PHASE_01_IMPLEMENTATION.md)
 
 ## Stack
@@ -29,11 +30,13 @@ Requires Node 20.19+ (tested on Node 22).
 npm ci
 ```
 
+Local development also needs a `.env` file:
+
 ```bash
 cp .env.example .env
 ```
 
-Fill in `.env` with your Supabase project URL and **publishable** key (Project Settings → API Keys). Never put the `service_role`/secret key in a `VITE_` variable: everything prefixed `VITE_` ships to the browser.
+Fill it in with your Supabase project URL and **publishable** key (Project Settings → API Keys). Production builds read `.env.production`, which is committed and holds the same two public values, so Vercel needs no configuration. Never put the `service_role`/secret key in any `VITE_` variable or committed file: everything prefixed `VITE_` ships to the browser.
 
 ```bash
 npm run dev
@@ -91,7 +94,7 @@ The "Continue with Google" button only appears once the Google provider is enabl
 ## Deploying to Vercel
 
 1. Import the GitHub repo into Vercel (framework preset: Vite).
-2. Add environment variables `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
+2. No environment variables are required (`.env.production` is committed). Set `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` in Vercel only if you point the app at a different Supabase project.
 3. Deploy, then add the production URL to Supabase's Site URL / Redirect URLs and to the Google OAuth client (above).
 
 `vercel.json` rewrites all app routes to `index.html` (client-side routing) and sets basic security headers.
