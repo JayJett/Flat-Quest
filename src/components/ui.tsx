@@ -203,7 +203,7 @@ export function EmptyState({
 
 export function SectionHeader({ title, action }: { title: string; action?: ReactNode }) {
   return (
-    <div className="mb-3 flex items-end justify-between gap-3">
+    <div className="mb-2 flex items-center justify-between gap-3">
       <h2 className="text-title font-bold">{title}</h2>
       {action}
     </div>

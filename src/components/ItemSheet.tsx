@@ -365,15 +365,17 @@ function ItemForm({ item, roomId, onDone }: { item: Item | null; roomId?: string
         />
       </Field>
 
-      <div className="bg-surface sticky bottom-0 -mx-5 flex flex-col gap-2 px-5 pt-2 pb-1">
+      {item && (
+        <Button type="button" variant="ghost" block icon={<Trash2 size={18} aria-hidden />} className="text-danger -mt-2" onClick={() => setConfirmDelete(true)}>
+          Delete item
+        </Button>
+      )}
+
+      {/* Flush with the sheet's bottom edge (the scroll area has 16px bottom padding). */}
+      <div className="bg-surface border-line sticky -bottom-4 z-10 -mx-5 -mt-2 border-t px-5 pt-3 pb-4">
         <Button type="submit" size="lg" block loading={saving}>
           {item ? 'Save changes' : 'Add item'}
         </Button>
-        {item && (
-          <Button type="button" variant="ghost" block icon={<Trash2 size={18} aria-hidden />} className="text-danger" onClick={() => setConfirmDelete(true)}>
-            Delete item
-          </Button>
-        )}
       </div>
 
       <ConfirmSheet

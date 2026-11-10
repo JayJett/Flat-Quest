@@ -25,8 +25,8 @@ export function RoomTile({ room, progress, compact }: { room: Room; progress: Pr
         name={room.icon}
         aria-hidden
         strokeWidth={1.15}
-        className="pointer-events-none absolute -top-3 -right-4 opacity-90"
-        style={{ width: '68%', height: '68%' }}
+        className="pointer-events-none absolute -top-2 -right-3 opacity-90"
+        style={{ width: '54%', height: '54%' }}
       />
       <div className="relative">
         <p className="text-[19px] leading-tight font-bold tabular-nums" style={{ opacity: 0.92 }}>

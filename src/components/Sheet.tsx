@@ -96,7 +96,7 @@ export function Sheet({ open, onClose, title, children, footer, hideTitle }: She
             className="bg-surface shadow-float relative flex max-h-[92dvh] w-full flex-col rounded-t-[28px] outline-none sm:max-w-lg sm:rounded-[28px]"
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
-            exit={{ y: '100%' }}
+            exit={{ y: '100%', transition: { duration: 0.22, ease: [0.4, 0, 1, 1] } }}
             transition={{ type: 'spring', stiffness: 420, damping: 42, mass: 0.9 }}
             drag="y"
             dragListener={false}

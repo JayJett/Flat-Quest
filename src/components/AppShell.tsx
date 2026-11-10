@@ -47,15 +47,11 @@ export function AppShell() {
 
   return (
     <DrawerContext.Provider value={{ open: () => setDrawerOpen(true) }}>
-      <div className="lg:flex">
+      <div className="lg:flex" style={{ paddingLeft: 'var(--safe-left)', paddingRight: 'var(--safe-right)' }}>
         <SideRail />
         <main
-          className="mx-auto w-full max-w-[560px] lg:max-w-5xl lg:px-10"
-          style={{
-            paddingLeft: 'var(--safe-left)',
-            paddingRight: 'var(--safe-right)',
-            paddingBottom: 'calc(var(--bottom-nav-h) + var(--safe-bottom) + 24px)',
-          }}
+          className="mx-auto w-full max-w-[560px] min-w-0 lg:max-w-5xl lg:px-10"
+          style={{ paddingBottom: 'calc(var(--bottom-nav-h) + var(--safe-bottom) + 24px)' }}
         >
           <Outlet />
         </main>
@@ -238,7 +234,7 @@ function Drawer({ open, onClose }: { open: boolean; onClose: () => void }) {
             style={{ paddingTop: 'calc(var(--safe-top) + 12px)', paddingBottom: 'calc(var(--safe-bottom) + 16px)' }}
             initial={{ x: '-100%' }}
             animate={{ x: 0 }}
-            exit={{ x: '-100%' }}
+            exit={{ x: '-100%', transition: { duration: 0.22, ease: [0.4, 0, 1, 1] } }}
             transition={{ type: 'spring', stiffness: 420, damping: 44 }}
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}

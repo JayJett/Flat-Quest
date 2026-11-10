@@ -49,10 +49,10 @@ export function HomePage() {
       <div className="px-4 lg:px-0">
         <section className="pt-2 pb-7">
           <p className="text-ink-2 text-[17px] font-medium">Kia ora{firstName ? `, ${firstName}` : ''}</p>
-          <h1 className="mt-1 text-[38px] leading-[1.04] tracking-[-0.035em] lg:text-[48px]">
-            <span className="font-light">Let’s make {household?.name ?? 'this place'}</span>
+          <h1 className="mt-1 text-[36px] leading-[1.06] tracking-[-0.035em] text-balance lg:text-[48px]">
+            <span className="font-light">Let’s furnish</span>
             <br />
-            <span className="font-extrabold">feel like home</span>
+            <span className="font-extrabold">{household?.name ?? 'our flat'}</span>
           </h1>
         </section>
 
@@ -103,7 +103,7 @@ export function HomePage() {
                     title="On your list"
                     action={
                       mine.length > 5 ? (
-                        <Link to={`/flatmates/${userId}`} className="text-ink-2 min-h-11 text-[15px] font-semibold">
+                        <Link to={`/flatmates/${userId}`} className="text-ink-2 inline-flex min-h-11 items-center text-[15px] font-semibold">
                           See all {mine.length}
                         </Link>
                       ) : undefined
@@ -125,7 +125,7 @@ export function HomePage() {
               <SectionHeader
                 title="Room by room"
                 action={
-                  <Link to="/rooms" className="text-ink-2 min-h-11 text-[15px] font-semibold">
+                  <Link to="/rooms" className="text-ink-2 inline-flex min-h-11 items-center text-[15px] font-semibold">
                     Show all
                   </Link>
                 }

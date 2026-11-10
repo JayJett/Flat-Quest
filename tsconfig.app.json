@@ -20,5 +20,5 @@
     "moduleDetection": "force",
     "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["src", "tests"]
+  "include": ["src"]
 }

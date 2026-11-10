@@ -260,12 +260,16 @@ export function ProfilePage() {
           </fieldset>
         </div>
 
+        {/* Save bar appears only when there is something to save. */}
         <div
-          className="bg-surface sticky z-20 -mx-4 mt-8 px-4 pt-3 pb-3 lg:mx-0 lg:px-0"
+          className={`bg-surface border-line sticky z-20 -mx-4 mt-8 border-t px-4 pt-3 pb-3 transition-[opacity,transform] duration-200 lg:mx-0 lg:border-t-0 lg:px-0 ${
+            dirty ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0'
+          }`}
           style={{ bottom: 'calc(var(--bottom-nav-h) + var(--safe-bottom))' }}
+          aria-hidden={!dirty}
         >
-          <Button type="submit" size="lg" block loading={saving} disabled={!dirty || !normaliseHex(hexInput)}>
-            {dirty ? 'Save profile' : 'Saved'}
+          <Button type="submit" size="lg" block loading={saving} disabled={!dirty || !normaliseHex(hexInput)} tabIndex={dirty ? 0 : -1}>
+            Save profile
           </Button>
         </div>
       </form>
