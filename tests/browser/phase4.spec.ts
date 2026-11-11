@@ -448,6 +448,22 @@ test.describe('purchases and deliveries', () => {
     await expect.poll(() => state.items[3]!.is_complete).toBe(true)
   })
 
+  test('adding purchase details to a finished item does not quietly change its plan', async ({ page }) => {
+    const state = await mockFlat(page)
+    Object.assign(state.items[0]!, { status: 'bringing', actual_price: 40, is_complete: true, completed_at: '2026-11-10T00:00:00.000Z', completed_by: uid })
+    await page.goto(`./rooms/${rid}`)
+    await page.getByRole('button', { name: /^Kettle\./ }).click()
+    await sheet(page, 'Item details').getByRole('button', { name: /^Shopping/ }).click()
+    const item = sheet(page, 'Kettle')
+    await item.getByRole('region', { name: 'Purchase and delivery' }).getByRole('button', { name: 'Edit', exact: true }).click()
+    const purchase = sheet(page, 'Record a purchase')
+    await purchase.getByLabel('Order reference').fill('RECEIPT-9')
+    await purchase.getByRole('button', { name: 'Save purchase' }).click()
+    await expect(purchase).toBeHidden()
+    expect(state.purchases[0]).toMatchObject({ order_reference: 'RECEIPT-9' })
+    expect(state.items[0]).toMatchObject({ status: 'bringing', actual_price: 40, is_complete: true })
+  })
+
   test('a stale purchase form is refused without overwriting, and a failed save changes nothing', async ({ page }) => {
     const state = await mockFlat(page, false, { flatmates: true })
     state.items[0]!.status = 'ordered'

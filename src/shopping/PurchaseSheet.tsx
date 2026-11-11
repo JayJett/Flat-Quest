@@ -43,7 +43,9 @@ function PurchaseForm({ item, onDone, onBusy }: { item: Item; onDone: () => void
   const [paid, setPaid] = useState(opened.amount != null ? String(opened.amount) : '')
   const [reference, setReference] = useState(p?.order_reference ?? '')
   const [notes, setNotes] = useState(p?.notes ?? '')
-  const [stage, setStage] = useState<PurchaseStage>(isPurchaseStage(opened.status) && opened.status !== 'need_to_buy' && opened.status !== 'shopping' ? opened.status : 'ordered')
+  const preOrder = opened.status === 'need_to_buy' || opened.status === 'shopping'
+  const [initialStage] = useState<PurchaseStage>(isPurchaseStage(opened.status) && !preOrder ? opened.status : 'ordered')
+  const [stage, setStage] = useState<PurchaseStage>(initialStage)
   const [method, setMethod] = useState(p?.delivery_method ?? '')
   const [expected, setExpected] = useState(p?.expected_on ?? '')
   const [tracking, setTracking] = useState(p?.tracking_url ?? '')
@@ -85,7 +87,9 @@ function PurchaseForm({ item, onDone, onBusy }: { item: Item; onDone: () => void
     onBusy(true)
     const res = await savePurchase(item.id, input, {
       expectedVersion: p?.updated_at ?? null,
-      ...(stage !== opened.status ? { status: { to: stage, from: opened.status } } : {}),
+      // Recording a purchase moves a "need to buy" item on to the chosen stage. Otherwise the
+      // item's plan only changes if the stage was changed here on purpose.
+      ...(stage !== opened.status && (preOrder || stage !== initialStage) ? { status: { to: stage, from: opened.status } } : {}),
       ...(amount !== opened.amount ? { amount: { to: amount as number | null, from: opened.amount } } : {}),
     })
     setSaving(false)
