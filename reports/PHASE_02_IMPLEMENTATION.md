@@ -46,9 +46,9 @@ Phase 2 is implemented and deployed, and the live household's data was preserved
 | --- | --- | --- |
 | Unit tests | 45/45 | Unit |
 | Browser checks | 120/120 across three suites | Browser (mocked) |
-| Invite system | 21 checks | Live DB, before the full-house fix (§3) |
+| Invite system | 21 checks, plus full-house checks in the RLS suite | Live DB |
 | Data migrations | Verified | Live DB |
-| Phase 2 RLS suite (80 checks) | **Written but not yet run.** The Supabase connector asked for approval to create temporary test users, and the prompt timed out. | — |
+| Phase 2 RLS suite | **80/80 pass** (run 11 Nov in the SQL Editor; cleanup confirmed) | Live DB |
 
 ---
 
@@ -254,7 +254,7 @@ Phase 2 is implemented and deployed, and the live household's data was preserved
 - Wishlist and votes.
 - Tour field, provided status and imports.
 
-**Status:** the Phase 1 suite passed 44/44 on the live DB. **The Phase 2 suite has not been run yet** (approval prompt timed out). The bucket policies' membership checks are tested by evaluating the same expressions, not by uploading real objects through SQL.
+**Status:** the Phase 2 suite passed **80/80** on the live database. Jarden ran it in the Supabase SQL Editor on 11 Nov 2026. I then confirmed 80 results recorded, all passing, 0 test users or test flats left, and the real data intact (1 flat, 2 members, 107 items). The first attempt failed with `relation "rls_results" does not exist`, because the editor doesn't keep temporary tables between statements; the suite now runs as a single block and stores results in a private `rls_check` schema. The bucket policies' membership checks are tested by evaluating the same expressions, not by uploading real objects through SQL.
 
 ---
 
@@ -269,7 +269,7 @@ Phase 2 is implemented and deployed, and the live household's data was preserved
 | Tour, photo, wishlist, visual (`p2b`) | **59/59**: tour on 3 sizes, Escape/Skip/replay, photo upload/crop/replace/remove, iPhone SE headline fit, wishlist flows, header opacity, bottom clearance, reduced motion | Browser (mocked) |
 | Invite system, live | 21 checks (one finding fixed, see §3) | Live DB |
 | Data migrations, live | 15/15 assignments, 5 provided appliances, columns dropped, archive present | Live DB |
-| Phase 2 RLS suite | **Not run yet** | — |
+| Phase 2 RLS suite | **80/80** | Live DB |
 
 Bugs found and fixed through these tests:
 - **Tour:** the last step was skipped on sub-pages, the card height was measured while switching steps, cards were placed off-screen, and the spotlight measured an item still animating in.
@@ -298,7 +298,7 @@ All screenshots in `reports/screenshots/` use **test fixtures** and the neutral 
 
 ## 13. Known limitations
 
-1. **The Phase 2 RLS suite has not run on the live DB yet.** It needs your approval in the Supabase connector, or you can paste the file into the SQL editor.
+1. **RLS storage tests are indirect.** The storage rules are verified by evaluating their membership expressions, not by uploading real files through the Storage API.
 2. **Not tested on a real iPhone.** All UI testing was Chromium emulation with mocked network, including the tour on iOS Safari, file pickers, pinch-zoom and realtime between two real devices.
 3. **The street address is still in Git history** (Phase 1 commits and screenshots). It's removed from the current files only. Free GitHub Pages requires a public repo, so making the repo private would stop hosting unless you upgrade to GitHub Pro. Rewriting history would need your go-ahead, because it rewrites shared history.
 4. **Older links can't be shown again** (by design: only their hash exists). The UI offers replace instead.
@@ -313,7 +313,7 @@ All screenshots in `reports/screenshots/` use **test fixtures** and the neutral 
 
 ## 14. Manual configuration still required
 
-1. **Approve and run the RLS suite.** Reply "go" so I can run it, or paste `supabase/tests/rls_verification.sql` into Supabase → SQL Editor and check every row says PASS.
+1. **(Done)** RLS suite: 80/80 PASS. Re-run it after future schema changes by pasting `supabase/tests/rls_verification.sql` into the SQL Editor.
 2. **Bring the 20 wishlist ideas across.** On the Wishlist tab, tap **Bring them across** (one tap, idempotent). I didn't run it myself: it needs the same database approval, and it's better done by a member so it's attributed to the flat.
 3. **Leaked-password protection.** Supabase → Authentication → (Sign In / Providers or Attack Protection) → enable *Prevent use of leaked passwords*. This may require a paid plan; if it's unavailable, keep the 8+ character minimum.
 4. **Custom SMTP** (recommended before inviting Emily and Dan), or keep "Confirm email" off (`SETUP_GUIDE.md` Part 3).
