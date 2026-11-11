@@ -13,6 +13,9 @@ export const STATUS_TONE: Record<Status, string> = {
   need_to_buy: 'text-orange-ink',
   shopping: 'text-periwinkle-ink',
   ordered: 'text-green-ink',
+  on_the_way: 'text-green-ink',
+  ready_to_collect: 'text-green-ink',
+  delivered: 'text-green-ink',
   provided: 'text-ink-2',
   not_needed: 'text-ink-2',
 }

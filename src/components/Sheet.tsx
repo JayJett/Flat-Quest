@@ -23,7 +23,8 @@ export function useFocusTrap(active: boolean, ref: React.RefObject<HTMLElement |
     focusStack.push(node)
     document.body.style.overflow = 'hidden'
     const t = window.setTimeout(() => {
-      if (focusStack.at(-1) !== node) return
+      // Leave focus alone if it has already moved inside (a fast keyboard user got there first).
+      if (focusStack.at(-1) !== node || (document.activeElement !== node && node.contains(document.activeElement))) return
       const target = node?.querySelector<HTMLElement>('[data-autofocus]') ?? node
       target?.focus({ preventScroll: true })
     }, 30)
