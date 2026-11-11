@@ -5,6 +5,7 @@ import { Link } from 'react-router'
 import { useAuth } from '@/auth/AuthProvider'
 import { PageHeader } from '@/components/AppShell'
 import { ItemRow } from '@/components/ItemRow'
+import { HouseholdActivity } from '@/components/HouseholdActivity'
 import { HouseholdPhoto } from '@/components/HouseholdPhoto'
 import { ItemSheet } from '@/components/ItemSheet'
 import { AnimatedNumber, EmptyState, IconButton, ProgressBar, SectionHeader } from '@/components/ui'
@@ -102,6 +103,7 @@ export function HomePage() {
               </section>
 
               <NextActionCard action={action} />
+              <HouseholdActivity key={household?.id} />
 
               {mine.length > 0 && (
                 <section className="mt-9" aria-labelledby="mine-h">

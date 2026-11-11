@@ -3,6 +3,9 @@ import { AnimatePresence, motion, useDragControls, type PanInfo } from 'motion/r
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
+const focusStack: HTMLElement[] = []
+let bodyOverflow = ''
+
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select,textarea,[tabindex]:not([tabindex="-1"])'
 
 /** Traps focus inside `ref` while active and restores it on close. */
@@ -15,37 +18,45 @@ export function useFocusTrap(active: boolean, ref: React.RefObject<HTMLElement |
     if (!active) return
     const previous = document.activeElement as HTMLElement | null
     const node = ref.current
+    if (!node) return
+    if (focusStack.length === 0) bodyOverflow = document.body.style.overflow
+    focusStack.push(node)
+    document.body.style.overflow = 'hidden'
     const t = window.setTimeout(() => {
+      if (focusStack.at(-1) !== node) return
       const target = node?.querySelector<HTMLElement>('[data-autofocus]') ?? node
       target?.focus({ preventScroll: true })
     }, 30)
     const onKey = (e: KeyboardEvent) => {
+      if (focusStack.at(-1) !== node) return
       if (e.key === 'Escape') {
-        e.stopPropagation()
+        e.preventDefault()
+        e.stopImmediatePropagation()
         escRef.current()
         return
       }
       if (e.key !== 'Tab' || !node) return
       const els = [...node.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.offsetParent !== null)
-      if (els.length === 0) return
+      if (els.length === 0) { e.preventDefault(); node.focus(); return }
       const first = els[0]!
       const last = els[els.length - 1]!
-      if (e.shiftKey && document.activeElement === first) {
+      if (e.shiftKey && (document.activeElement === first || !els.includes(document.activeElement as HTMLElement))) {
         e.preventDefault()
         last.focus()
-      } else if (!e.shiftKey && document.activeElement === last) {
+      } else if (!e.shiftKey && (document.activeElement === last || !els.includes(document.activeElement as HTMLElement))) {
         e.preventDefault()
         first.focus()
       }
     }
     document.addEventListener('keydown', onKey)
-    const { overflow } = document.body.style
-    document.body.style.overflow = 'hidden'
     return () => {
       window.clearTimeout(t)
       document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = overflow
-      previous?.focus?.({ preventScroll: true })
+      const wasTop = focusStack.at(-1) === node
+      const index = focusStack.indexOf(node)
+      if (index >= 0) focusStack.splice(index, 1)
+      if (focusStack.length === 0) document.body.style.overflow = bodyOverflow
+      if (wasTop && previous?.isConnected) previous.focus({ preventScroll: true })
     }
   }, [active, ref])
 }
@@ -58,20 +69,22 @@ interface SheetProps {
   footer?: ReactNode
   /** Hide the visible title (still announced). */
   hideTitle?: boolean
+  busy?: boolean
 }
 
 /**
  * Bottom sheet on phones, centred dialog on wider screens. Floats above the
  * interface, so it is one of the few places a (subtle) shadow is allowed.
  */
-export function Sheet({ open, onClose, title, children, footer, hideTitle }: SheetProps) {
+export function Sheet({ open, onClose, title, children, footer, hideTitle, busy = false }: SheetProps) {
   const ref = useRef<HTMLDivElement>(null)
   const titleId = useId()
   const drag = useDragControls()
-  useFocusTrap(open, ref, onClose)
+  const close = () => { if (!busy) onClose() }
+  useFocusTrap(open, ref, close)
 
   const onDragEnd = (_: unknown, info: PanInfo) => {
-    if (info.offset.y > 120 || info.velocity.y > 600) onClose()
+    if (info.offset.y > 120 || info.velocity.y > 600) close()
   }
 
   return createPortal(
@@ -84,13 +97,14 @@ export function Sheet({ open, onClose, title, children, footer, hideTitle }: She
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            onClick={onClose}
+            onClick={close}
             aria-hidden
           />
           <motion.div
             ref={ref}
             role="dialog"
             aria-modal="true"
+            aria-busy={busy}
             aria-labelledby={titleId}
             tabIndex={-1}
             className="bg-surface shadow-float relative flex max-h-[92dvh] w-full flex-col rounded-t-[28px] outline-none sm:max-w-lg sm:rounded-[28px]"
@@ -118,8 +132,9 @@ export function Sheet({ open, onClose, title, children, footer, hideTitle }: She
               </h2>
               <button
                 type="button"
-                onClick={onClose}
+                onClick={close}
                 aria-label="Close"
+                disabled={busy}
                 className="pressable text-ink-2 active:bg-surface-2 -mr-2 ml-auto inline-flex h-11 w-11 items-center justify-center rounded-full"
               >
                 <X size={22} aria-hidden />
@@ -161,7 +176,7 @@ export function ConfirmSheet({
   onClose: () => void
 }) {
   return (
-    <Sheet open={open} onClose={onClose} title={title}>
+    <Sheet open={open} onClose={onClose} title={title} busy={busy}>
       <p className="text-ink-2 text-[16px]">{body}</p>
       <div className="mt-6 flex flex-col gap-2.5">
         <button
@@ -173,7 +188,7 @@ export function ConfirmSheet({
         >
           {busy ? 'Working…' : confirmLabel}
         </button>
-        <button type="button" onClick={onClose} className="pressable bg-surface-2 min-h-12 rounded-2xl font-semibold">
+        <button type="button" disabled={busy} onClick={onClose} className="pressable bg-surface-2 min-h-12 rounded-2xl font-semibold">
           Cancel
         </button>
       </div>

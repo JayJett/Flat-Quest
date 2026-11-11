@@ -72,6 +72,16 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
     void load()
   }, [load])
 
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible') void load() }
+    document.addEventListener('visibilitychange', refresh)
+    window.addEventListener('online', refresh)
+    return () => {
+      document.removeEventListener('visibilitychange', refresh)
+      window.removeEventListener('online', refresh)
+    }
+  }, [load])
+
   // Realtime: ideas and votes from flatmates.
   useEffect(() => {
     if (!hid) return

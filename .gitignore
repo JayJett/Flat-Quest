@@ -8,3 +8,6 @@ dist
 .vercel
 test-results
 playwright-report
+
+playwright-report/
+test-results/

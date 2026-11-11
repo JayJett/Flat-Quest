@@ -17,6 +17,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/AuthProvider'
 import { ProfileIcon } from '@/design/icons'
 import { useHousehold } from '@/household/HouseholdProvider'
+import { ConnectionStatus } from './ConnectionStatus'
 import { Avatar } from './Avatar'
 import { useFocusTrap } from './Sheet'
 import { TourProvider, useTour } from './Tour'
@@ -56,6 +57,7 @@ export function AppShell() {
           className="mx-auto w-full max-w-[560px] min-w-0 lg:max-w-5xl lg:px-10"
           style={{ paddingBottom: 'calc(var(--bottom-nav-h) + var(--safe-bottom) + 24px)' }}
         >
+          <ConnectionStatus />
           <Outlet />
         </main>
       </div>

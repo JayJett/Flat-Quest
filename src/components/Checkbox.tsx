@@ -23,10 +23,12 @@ export function CompleteToggle({ checked, label, onToggle, size = 30 }: Complete
     if (busy) return
     const next = !checked
     setBusy(true)
-    if (navigator.vibrate && next) navigator.vibrate(8)
     const ok = await onToggle(next)
     setBusy(false)
-    if (ok && next) setBurst((b) => b + 1)
+    if (ok && next) {
+      if (!reduce && navigator.vibrate) navigator.vibrate(8)
+      setBurst((b) => b + 1)
+    }
   }
 
   return (
@@ -36,6 +38,8 @@ export function CompleteToggle({ checked, label, onToggle, size = 30 }: Complete
       aria-checked={checked}
       aria-label={label}
       onClick={click}
+      disabled={busy}
+      aria-busy={busy}
       className="relative -m-2 inline-flex shrink-0 items-center justify-center p-2"
       style={{ width: size + 16, height: size + 16 }}
     >

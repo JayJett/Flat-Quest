@@ -1,21 +1,28 @@
+import { lazy, Suspense } from 'react'
+import { FullScreenLoader } from '@/auth/guards'
 import { MotionConfig } from 'motion/react'
 import { createBrowserRouter, Navigate, Outlet, RouterProvider } from 'react-router'
 import { AuthProvider } from '@/auth/AuthProvider'
 import { RequireAuth, RequireHousehold } from '@/auth/guards'
 import { AppShell } from '@/components/AppShell'
+import { RouteError } from '@/components/RouteError'
 import { ToastProvider } from '@/components/Toast'
 import { UserScopedHouseholdProvider } from '@/household/HouseholdProvider'
-import { AuthCallbackPage, ResetPasswordPage } from '@/pages/AuthCallback'
-import { FlatmateItemsPage, FlatmatesPage } from '@/pages/Flatmates'
-import { HomePage } from '@/pages/Home'
-import { ProfilePage } from '@/pages/Profile'
-import { RoomDetailPage } from '@/pages/RoomDetail'
-import { RoomsPage } from '@/pages/Rooms'
-import { SettingsPage } from '@/pages/Settings'
-import { SignInPage } from '@/pages/SignIn'
-import { JoinPage, WelcomePage } from '@/pages/Welcome'
-import { WishlistPage } from '@/pages/Wishlist'
 import { BASE_PATH } from '@/lib/urls'
+
+const AuthCallbackPage = lazy(() => import('@/pages/AuthCallback').then((m) => ({ default: m.AuthCallbackPage })))
+const ResetPasswordPage = lazy(() => import('@/pages/AuthCallback').then((m) => ({ default: m.ResetPasswordPage })))
+const FlatmateItemsPage = lazy(() => import('@/pages/Flatmates').then((m) => ({ default: m.FlatmateItemsPage })))
+const FlatmatesPage = lazy(() => import('@/pages/Flatmates').then((m) => ({ default: m.FlatmatesPage })))
+const HomePage = lazy(() => import('@/pages/Home').then((m) => ({ default: m.HomePage })))
+const ProfilePage = lazy(() => import('@/pages/Profile').then((m) => ({ default: m.ProfilePage })))
+const RoomDetailPage = lazy(() => import('@/pages/RoomDetail').then((m) => ({ default: m.RoomDetailPage })))
+const RoomsPage = lazy(() => import('@/pages/Rooms').then((m) => ({ default: m.RoomsPage })))
+const SettingsPage = lazy(() => import('@/pages/Settings').then((m) => ({ default: m.SettingsPage })))
+const SignInPage = lazy(() => import('@/pages/SignIn').then((m) => ({ default: m.SignInPage })))
+const JoinPage = lazy(() => import('@/pages/Welcome').then((m) => ({ default: m.JoinPage })))
+const WelcomePage = lazy(() => import('@/pages/Welcome').then((m) => ({ default: m.WelcomePage })))
+const WishlistPage = lazy(() => import('@/pages/Wishlist').then((m) => ({ default: m.WishlistPage })))
 
 function Providers() {
   return (
@@ -34,6 +41,7 @@ function Providers() {
 const router = createBrowserRouter([
   {
     element: <Providers />,
+    errorElement: <RouteError />,
     children: [
       { path: '/sign-in', element: <SignInPage /> },
       { path: '/auth/callback', element: <AuthCallbackPage /> },
@@ -65,5 +73,5 @@ const router = createBrowserRouter([
 ], { basename: BASE_PATH || '/' })
 
 export default function App() {
-  return <RouterProvider router={router} />
+  return <Suspense fallback={<FullScreenLoader />}><RouterProvider router={router} /></Suspense>
 }
