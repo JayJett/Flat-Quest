@@ -93,7 +93,7 @@ Phase 2 is implemented and deployed, and the live household's data was preserved
 - An outsider can't list or cancel links.
 - Joining works, and repeat joins are no-ops.
 - Cancelling invalidates the code and deletes its Vault entry; a new link can then be created.
-- **One finding fixed:** when the flat was full, the old link still showed as active and blocked new ones. Migration `20261111000003_invite_full_house.sql` now retires links when the last place is taken. **Re-verifying this on the live DB is part of the pending RLS suite.**
+- **One finding fixed:** when the flat was full, the old link still showed as active and blocked new ones. Migration `20261111000003_invite_full_house.sql` now retires links when the last place is taken. Re-verified on the live DB: the RLS suite's full-house checks pass.
 
 ---
 
