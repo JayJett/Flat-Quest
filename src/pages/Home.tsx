@@ -1,4 +1,4 @@
-import { ArrowRight, ChevronRight, Plus } from 'lucide-react'
+import { ArrowRight, ChevronRight, Plus, ShoppingBag } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
@@ -12,6 +12,7 @@ import { AnimatedNumber, EmptyState, IconButton, ProgressBar, SectionHeader } fr
 import { RoomIcon } from '@/design/icons'
 import { roomColor } from '@/design/tokens'
 import { PRIORITY_RANK, type Item } from '@/lib/domain'
+import { shoppingSummary, summaryLine } from '@/lib/shopping'
 import { nextAction, openItemsFor, progressOf, roomProgress } from '@/lib/stats'
 import { useHousehold } from '@/household/HouseholdProvider'
 
@@ -33,6 +34,7 @@ export function HomePage() {
       ),
     [userId, items],
   )
+  const shopping = useMemo(() => shoppingSummary(items), [items])
   const firstName = me?.display_name?.split(' ')[0]
   const pct = Math.round(progress.ratio * 100)
 
@@ -103,6 +105,19 @@ export function HomePage() {
               </section>
 
               <NextActionCard action={action} />
+              {shopping.toBuy + shopping.inProgress > 0 && (
+                <Link
+                  to="/rooms/shopping"
+                  className="pressable bg-surface-2 active:bg-surface-3 mt-3 flex min-h-[68px] items-center gap-3.5 rounded-[var(--radius-card)] px-5 py-3"
+                >
+                  <ShoppingBag size={24} strokeWidth={1.9} className="shrink-0" aria-hidden />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[17px] leading-snug font-bold">Shopping</span>
+                    <span className="text-ink-2 block truncate text-[15px]">{summaryLine(shopping)}</span>
+                  </span>
+                  <ChevronRight size={18} className="text-ink-3 shrink-0" aria-hidden />
+                </Link>
+              )}
               <HouseholdActivity key={household?.id} />
 
               {mine.length > 0 && (

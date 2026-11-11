@@ -62,6 +62,11 @@ export type RoomRow = {
   color: string
   sort_order: number
   import_key: string | null
+  /** Optional measurements in centimetres (Phase 4). */
+  width_cm: number | null
+  length_cm: number | null
+  height_cm: number | null
+  measurement_notes: string | null
   created_at: string
   updated_at: string
 }
@@ -124,6 +129,63 @@ export type WishlistVoteRow = {
   created_at: string
 }
 
+/** A candidate product for one checklist item. Never a purchase in itself. */
+export type ProductOptionRow = {
+  id: string
+  household_id: string
+  item_id: string
+  name: string
+  retailer: string | null
+  price: number | null
+  url: string | null
+  photo_path: string | null
+  notes: string | null
+  width_cm: number | null
+  depth_cm: number | null
+  height_cm: number | null
+  is_selected: boolean
+  selected_at: string | null
+  selected_by: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ProductPreferenceRow = {
+  item_id: string
+  user_id: string
+  household_id: string
+  option_id: string
+  created_at: string
+  updated_at: string
+}
+
+export type PurchaseCoordinatorRow = {
+  item_id: string
+  household_id: string
+  user_id: string
+  claimed_at: string
+}
+
+export type ItemPurchaseRow = {
+  item_id: string
+  household_id: string
+  option_id: string | null
+  purchased_by: string | null
+  /** Calendar dates (YYYY-MM-DD), never timestamps. */
+  purchased_on: string | null
+  order_reference: string | null
+  notes: string | null
+  delivery_method: string | null
+  expected_on: string | null
+  tracking_url: string | null
+  delivery_notes: string | null
+  arrived_on: string | null
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type InviteSummary = {
   id: string
   code: string | null
@@ -149,6 +211,10 @@ export type Database = {
       item_assignees: Table<ItemAssigneeRow, 'item_id' | 'household_id' | 'user_id'>
       wishlist_items: Table<WishlistItemRow, 'household_id' | 'title'>
       wishlist_votes: Table<WishlistVoteRow, 'idea_id' | 'household_id'>
+      product_options: Table<ProductOptionRow, 'household_id' | 'item_id' | 'name'>
+      product_preferences: Table<ProductPreferenceRow, 'item_id' | 'household_id' | 'option_id'>
+      purchase_coordinators: Table<PurchaseCoordinatorRow, 'item_id' | 'household_id'>
+      item_purchases: Table<ItemPurchaseRow, 'item_id' | 'household_id'>
     }
     Views: { [_ in never]: never }
     Functions: {
@@ -175,6 +241,28 @@ export type Database = {
         Returns: { ideas_created: number; ideas_skipped: number }[]
       }
       revoke_household_invite: { Args: { p_invite: string }; Returns: undefined }
+      save_item_purchase: {
+        Args: {
+          p_item: string
+          p_expected_version: string | null
+          p_option: string | null
+          p_purchased_by: string | null
+          p_purchased_on: string | null
+          p_order_reference: string | null
+          p_notes: string | null
+          p_delivery_method: string | null
+          p_expected_on: string | null
+          p_tracking_url: string | null
+          p_delivery_notes: string | null
+          p_arrived_on: string | null
+          p_status?: string | null
+          p_expected_status?: string | null
+          p_set_amount?: boolean
+          p_amount?: number | null
+          p_expected_amount?: number | null
+        }
+        Returns: Json
+      }
     }
     Enums: { [_ in never]: never }
     CompositeTypes: { [_ in never]: never }

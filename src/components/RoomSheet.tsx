@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 import { ROOM_ICONS, RoomIcon } from '@/design/icons'
 import { ROOM_COLORS, roomColor } from '@/design/tokens'
 import type { Room } from '@/lib/domain'
+import { formatCm, MAX_ROOM_CM, MAX_ROOM_HEIGHT_CM, parseCm } from '@/lib/shopping'
 import { useHousehold } from '@/household/HouseholdProvider'
 import { ConfirmSheet, Sheet } from './Sheet'
 import { useToast } from './Toast'
@@ -22,6 +23,13 @@ function RoomForm({ room, onDone }: { room: Room | null; onDone: () => void }) {
   const toast = useToast()
   const navigate = useNavigate()
   const nameId = useId()
+  const ids = { w: useId(), l: useId(), h: useId(), notes: useId() }
+  const cmText = (v: number | null | undefined) => (v != null ? formatCm(v) : '')
+  const [width, setWidth] = useState(cmText(room?.width_cm))
+  const [length, setLength] = useState(cmText(room?.length_cm))
+  const [height, setHeight] = useState(cmText(room?.height_cm))
+  const [measureNotes, setMeasureNotes] = useState(room?.measurement_notes ?? '')
+  const [measureError, setMeasureError] = useState<string | null>(null)
   const [name, setName] = useState(room?.name ?? '')
   const [icon, setIcon] = useState(room?.icon ?? 'sofa')
   const [color, setColor] = useState(room?.color ?? 'blue')
@@ -37,8 +45,24 @@ function RoomForm({ room, onDone }: { room: Room | null; onDone: () => void }) {
     const trimmed = name.trim()
     if (!trimmed) return setError('Give the room a name.')
     if (trimmed.length > 40) return setError('Keep it under 40 characters.')
+    const w = parseCm(width, MAX_ROOM_CM)
+    const l = parseCm(length, MAX_ROOM_CM)
+    const h = parseCm(height, MAX_ROOM_HEIGHT_CM)
+    if (w === 'invalid' || l === 'invalid' || h === 'invalid') {
+      return setMeasureError(`Use centimetres: up to ${MAX_ROOM_CM} for width and length, ${MAX_ROOM_HEIGHT_CM} for height.`)
+    }
+    setMeasureError(null)
+    const measurements = { width_cm: w, length_cm: l, height_cm: h, measurement_notes: measureNotes.trim() || null }
     setSaving(true)
-    const res = room ? await updateRoom(room.id, { name: trimmed, icon, color }) : await createRoom({ name: trimmed, icon, color })
+    let res
+    if (room) {
+      // Only send what changed, so an old sheet can't undo a flatmate's edit to another field.
+      const next = { name: trimmed, icon, color, ...measurements }
+      const patch = Object.fromEntries(Object.entries(next).filter(([k, v]) => room[k as keyof Room] !== v))
+      res = Object.keys(patch).length > 0 ? await updateRoom(room.id, patch) : { ok: true as const, data: undefined }
+    } else {
+      res = await createRoom({ name: trimmed, icon, color, ...measurements })
+    }
     setSaving(false)
     if (!res.ok) return toast.error(res.error)
     toast.success(room ? 'Room updated' : `Added ${trimmed}`)
@@ -121,6 +145,53 @@ function RoomForm({ room, onDone }: { room: Room | null; onDone: () => void }) {
             </button>
           ))}
         </div>
+      </fieldset>
+
+      <fieldset>
+        <legend className="mb-0.5 text-[14px] font-semibold">Measurements</legend>
+        <p className="text-ink-2 mb-2 text-[14px]">Optional, in centimetres. Handy when comparing furniture.</p>
+        <div className="grid grid-cols-3 gap-2.5">
+          {(
+            [
+              ['Width', ids.w, width, setWidth],
+              ['Length', ids.l, length, setLength],
+              ['Height', ids.h, height, setHeight],
+            ] as const
+          ).map(([label, id, value, set]) => (
+            <label key={label} htmlFor={id} className="flex flex-col gap-1">
+              <span className="text-ink-2 text-[14px] font-medium">{label}</span>
+              <input
+                id={id}
+                className="field tabular-nums"
+                inputMode="decimal"
+                placeholder="cm"
+                value={value}
+                onChange={(e) => {
+                  set(e.target.value)
+                  setMeasureError(null)
+                }}
+                aria-invalid={!!measureError}
+                aria-label={`Room ${label.toLowerCase()} in centimetres`}
+              />
+            </label>
+          ))}
+        </div>
+        {measureError && (
+          <p className="text-danger mt-1.5 text-[14px]" role="alert">
+            {measureError}
+          </p>
+        )}
+        <label htmlFor={ids.notes} className="text-ink-2 mt-3 mb-1 block text-[14px] font-medium">
+          Things to watch for
+        </label>
+        <input
+          id={ids.notes}
+          className="field"
+          value={measureNotes}
+          maxLength={500}
+          onChange={(e) => setMeasureNotes(e.target.value)}
+          placeholder="e.g. Door is 76 cm wide, heater on the left wall"
+        />
       </fieldset>
 
       <div className="flex flex-col gap-2">

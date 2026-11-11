@@ -38,7 +38,7 @@ export type ItemPatch = Partial<
   >
 >
 export type ItemInput = ItemPatch & Pick<Item, 'name' | 'room_id'>
-export type RoomPatch = Partial<Pick<Room, 'name' | 'icon' | 'color' | 'sort_order'>>
+export type RoomPatch = Partial<Pick<Room, 'name' | 'icon' | 'color' | 'sort_order' | 'width_cm' | 'length_cm' | 'height_cm' | 'measurement_notes'>>
 export type ProfilePatch = Partial<Pick<Profile, 'display_name' | 'avatar_path' | 'accent_color' | 'icon' | 'tour_completed_at'>>
 
 type Result<T = void> = { ok: true; data: T } | { ok: false; error: string }
@@ -58,10 +58,12 @@ interface HouseholdState {
   createItem: (input: ItemInput) => Promise<Result<Item>>
   updateItem: (id: string, patch: ItemPatch, expectedVersion?: string) => Promise<Result<Item>>
   deleteItem: (id: string) => Promise<Result>
+  /** Adopt an item row the server just returned (e.g. from save_item_purchase), as a realtime update would. */
+  applyItemRow: (row: ItemRow) => void
   /** Replace who is responsible for an item (0 = unclaimed, 2+ = shared). Optimistic. */
   setAssignees: (itemId: string, userIds: string[]) => Promise<Result>
   // Rooms
-  createRoom: (input: { name: string; icon: string; color: string }) => Promise<Result<Room>>
+  createRoom: (input: { name: string; icon: string; color: string } & Pick<RoomPatch, 'width_cm' | 'length_cm' | 'height_cm' | 'measurement_notes'>) => Promise<Result<Room>>
   updateRoom: (id: string, patch: RoomPatch) => Promise<Result>
   deleteRoom: (id: string) => Promise<Result>
   reorderRooms: (orderedIds: string[]) => Promise<Result>
@@ -416,6 +418,13 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     return { ok: true, data: undefined }
   }, [])
 
+  const applyItemRow = useCallback<HouseholdState['applyItemRow']>((row) => {
+    if (row.household_id !== householdIdRef.current || pending.current.has(row.id)) return
+    const item = toItem(row)
+    itemsRef.current = itemsRef.current.map((i) => (i.id === item.id ? item : i))
+    setItems((prev) => (prev.some((i) => i.id === item.id) ? prev.map((i) => (i.id === item.id ? item : i)) : [...prev, item]))
+  }, [])
+
   // ---------------------------------------------------------------- rooms
   const createRoom = useCallback<HouseholdState['createRoom']>(
     async (input) => {
@@ -600,6 +609,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       createItem,
       updateItem,
       deleteItem,
+      applyItemRow,
       setAssignees,
       createRoom,
       updateRoom,
@@ -625,6 +635,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       createItem,
       updateItem,
       deleteItem,
+      applyItemRow,
       setAssignees,
       createRoom,
       updateRoom,

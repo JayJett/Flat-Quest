@@ -3,7 +3,22 @@ import type { HouseholdRow, ItemRow, ProfileRow, RoomRow } from './database.type
 export const PRIORITIES = ['must_have', 'nice_to_have', 'maybe_later'] as const
 export type Priority = (typeof PRIORITIES)[number]
 
-export const STATUSES = ['to_decide', 'bringing', 'need_to_buy', 'shopping', 'ordered', 'provided', 'not_needed'] as const
+/**
+ * One status system for the whole app. The six from need_to_buy to delivered are the
+ * purchase stages Shopping works with; none of them means "in the flat" (is_complete).
+ */
+export const STATUSES = [
+  'to_decide',
+  'bringing',
+  'need_to_buy',
+  'shopping',
+  'ordered',
+  'on_the_way',
+  'ready_to_collect',
+  'delivered',
+  'provided',
+  'not_needed',
+] as const
 export type Status = (typeof STATUSES)[number]
 
 export const OWNERSHIPS = ['to_decide', 'member', 'shared', 'landlord'] as const
@@ -21,6 +36,9 @@ export const STATUS_LABEL: Record<Status, string> = {
   need_to_buy: 'Need to buy',
   shopping: 'Shopping',
   ordered: 'Ordered',
+  on_the_way: 'On the way',
+  ready_to_collect: 'Ready to collect',
+  delivered: 'Delivered',
   provided: 'Provided with flat',
   not_needed: 'Not needed',
 }
@@ -85,8 +103,11 @@ export const STATUS_RANK: Record<Status, number> = {
   shopping: 2,
   bringing: 3,
   ordered: 4,
-  provided: 5,
-  not_needed: 6,
+  on_the_way: 5,
+  ready_to_collect: 6,
+  delivered: 7,
+  provided: 8,
+  not_needed: 9,
 }
 
 /** "Jarden", "Jarden and Madi", "Jarden, Madi and Emily". */

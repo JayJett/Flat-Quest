@@ -47,3 +47,20 @@ export async function prepareImage(file: File, maxEdge = 1280): Promise<{ blob: 
   if (!jpg) throw new Error('Your browser couldn’t process the image.')
   return { blob: jpg, ext: 'jpg' }
 }
+
+/** The household-media bucket rejects anything larger (see the storage migration). */
+export const MEDIA_MAX_UPLOAD_BYTES = 3 * 1024 * 1024
+
+/**
+ * Product photos: validated, downscaled and re-encoded on the device (which also
+ * drops EXIF/location metadata), then checked against the bucket's size limit.
+ */
+export async function prepareProductPhoto(file: File): Promise<{ blob: Blob; ext: 'webp' | 'jpg' }> {
+  const invalid = validateAvatarFile(file)
+  if (invalid) throw new Error(invalid)
+  for (const edge of [1200, 900, 640]) {
+    const out = await prepareImage(file, edge)
+    if (out.blob.size <= MEDIA_MAX_UPLOAD_BYTES) return out
+  }
+  throw new Error('That photo is too large even after shrinking. Try a different one.')
+}

@@ -1,7 +1,7 @@
--- Flat Quest — RLS / access-isolation verification (Phase 2).
+-- Flat Quest — RLS / access-isolation verification (Phases 1–4).
 --
 -- HOW TO RUN: Supabase dashboard → SQL Editor → New query → paste this whole file → Run.
--- The result table should show 80 rows, every one with result = PASS.
+-- The result table should show 163 rows, every one with result = PASS.
 --
 -- Creates throwaway auth users and two test flats, impersonates each user
 -- (request.jwt.claims + role), records expected vs actual outcomes, then deletes
@@ -20,7 +20,7 @@ revoke all on schema rls_check from public;
 grant usage on schema rls_check to authenticated, anon;
 
 create table rls_check.results (n serial primary key, test text, expected text, actual text);
-create table rls_check.ctx (hid uuid, code text, other_hid uuid, item1 uuid, item2 uuid, other_room uuid, idea uuid, conv uuid);
+create table rls_check.ctx (hid uuid, code text, other_hid uuid, item1 uuid, item2 uuid, other_room uuid, idea uuid, conv uuid, opt_a uuid, opt_b uuid, opt_r uuid);
 grant all on rls_check.results, rls_check.ctx to authenticated, anon;
 grant usage on sequence rls_check.results_n_seq to authenticated, anon;
 
@@ -167,6 +167,168 @@ values
   perform rls_check.rec('C: cannot convert A''s idea', 'error P0002', rls_check.try($q$select public.add_wishlist_to_checklist((select idea from rls_check.ctx))$q$));
   perform rls_check.rec('C: cannot import into A''s wishlist', 'error 42501', rls_check.try($q$select public.import_wishlist((select hid from rls_check.ctx), '[{"room":"x","title":"y"}]'::jsonb)$q$));
 
+  -- ===== Phase 4: shopping =====
+  -- Kettle (item1) is shared by A and B; Rug (item2) belongs to A and is complete.
+  perform set_config('request.jwt.claims', '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}', true);
+  perform rls_check.rec('A: purchase stages are values of the existing status', 'ok', rls_check.try($q$update public.items set status = 'on_the_way' where id = (select item1 from rls_check.ctx)$q$));
+  update public.items set status = 'shopping' where id = (select item1 from rls_check.ctx);
+  insert into public.product_options (household_id, item_id, name, retailer, price, url, width_cm, depth_cm, height_cm)
+    select hid, item1, 'Kettle A', 'Briscoes', 89.00, 'https://example.com/kettle-a', 22, 16, 25.5 from rls_check.ctx;
+  update rls_check.ctx set opt_a = (select id from public.product_options where name = 'Kettle A');
+  insert into public.product_options (household_id, item_id, name) select hid, item2, 'Rug option' from rls_check.ctx;
+  update rls_check.ctx set opt_r = (select id from public.product_options where name = 'Rug option');
+  perform rls_check.rec('A: option records who suggested it', '11111111-1111-4111-8111-111111111111', (select created_by::text from public.product_options o, rls_check.ctx c where o.id = c.opt_a));
+  perform rls_check.rec('A: cannot set who suggested an option', 'error 42501',
+    rls_check.try($q$insert into public.product_options (household_id, item_id, name, created_by) select hid, item1, 'Spoof', '22222222-2222-4222-8222-222222222222' from rls_check.ctx$q$));
+  perform rls_check.rec('A: cannot write selected_by directly', 'error 42501', rls_check.try($q$update public.product_options set selected_by = '22222222-2222-4222-8222-222222222222'$q$));
+  perform rls_check.rec('A: negative price rejected', 'error 23514', rls_check.try($q$update public.product_options set price = -1 where id = (select opt_a from rls_check.ctx)$q$));
+  perform rls_check.rec('A: non-web link rejected', 'error 23514', rls_check.try($q$update public.product_options set url = 'javascript:alert(1)' where id = (select opt_a from rls_check.ctx)$q$));
+  perform rls_check.rec('A: zero measurement rejected', 'error 23514', rls_check.try($q$update public.product_options set width_cm = 0 where id = (select opt_a from rls_check.ctx)$q$));
+  perform rls_check.rec('A: absurd measurement rejected', 'error 23514', rls_check.try($q$update public.product_options set height_cm = 2000.5 where id = (select opt_a from rls_check.ctx)$q$));
+  perform rls_check.rec('A: product photo must be in this household''s products folder', 'error 23514',
+    rls_check.try($q$update public.product_options set photo_path = (select other_hid from rls_check.ctx)::text || '/products/x.webp' where id = (select opt_a from rls_check.ctx)$q$));
+  perform rls_check.rec('A: product photo path cannot escape the products folder', 'error 23514',
+    rls_check.try($q$update public.product_options set photo_path = (select hid from rls_check.ctx)::text || '/products/../photo-1.webp' where id = (select opt_a from rls_check.ctx)$q$));
+  perform rls_check.rec('A: valid product photo path accepted', 'ok',
+    rls_check.try($q$update public.product_options set photo_path = (select hid from rls_check.ctx)::text || '/products/kettle-1700000000000.webp' where id = (select opt_a from rls_check.ctx)$q$));
+  perform rls_check.rec('A: option cannot move to another item', 'error 42501', rls_check.try($q$update public.product_options set item_id = (select item2 from rls_check.ctx) where id = (select opt_a from rls_check.ctx)$q$));
+
+  perform set_config('request.jwt.claims', '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}', true);
+  insert into public.product_options (household_id, item_id, name, retailer, price) select hid, item1, 'Kettle B', 'Kmart', 45 from rls_check.ctx;
+  update rls_check.ctx set opt_b = (select id from public.product_options where name = 'Kettle B');
+  perform rls_check.rec('B: competing option sits under the same item', '2,1', (select count(*)::text || ',' || count(distinct item_id)::text from public.product_options o, rls_check.ctx c where o.item_id = c.item1));
+  perform rls_check.rec('B: prefers an option', 'ok', rls_check.try($q$insert into public.product_preferences (item_id, household_id, option_id) select item1, hid, opt_b from rls_check.ctx$q$));
+  perform rls_check.rec('B: second preference for the same item rejected', 'error 23505', rls_check.try($q$insert into public.product_preferences (item_id, household_id, option_id) select item1, hid, opt_a from rls_check.ctx$q$));
+  perform rls_check.rec('B: cannot prefer on behalf of A', 'error 42501',
+    rls_check.try($q$insert into public.product_preferences (item_id, household_id, option_id, user_id) select item1, hid, opt_a, '11111111-1111-4111-8111-111111111111' from rls_check.ctx$q$));
+  perform rls_check.rec('B: changes own preference', '1', rls_check.val($q$with u as (update public.product_preferences set option_id = (select opt_a from rls_check.ctx) where item_id = (select item1 from rls_check.ctx) returning 1) select count(*)::text from u$q$));
+  update public.product_preferences set option_id = (select opt_b from rls_check.ctx) where item_id = (select item1 from rls_check.ctx) and user_id = '22222222-2222-4222-8222-222222222222';
+  perform rls_check.rec('B: cannot reassign a preference to someone else', 'error 42501', rls_check.try($q$update public.product_preferences set user_id = '11111111-1111-4111-8111-111111111111'$q$));
+
+  perform set_config('request.jwt.claims', '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}', true);
+  perform rls_check.rec('A: prefers a different option', 'ok', rls_check.try($q$insert into public.product_preferences (item_id, household_id, option_id) select item1, hid, opt_a from rls_check.ctx$q$));
+  perform rls_check.rec('A: cannot change B''s preference', '0', rls_check.val($q$with u as (update public.product_preferences set option_id = (select opt_a from rls_check.ctx) where user_id = '22222222-2222-4222-8222-222222222222' returning 1) select count(*)::text from u$q$));
+  perform rls_check.rec('A: cannot remove B''s preference', '0', rls_check.val($q$with u as (delete from public.product_preferences where user_id = '22222222-2222-4222-8222-222222222222' returning 1) select count(*)::text from u$q$));
+  perform rls_check.rec('A: preference must be an option of that same item', 'error 23503',
+    rls_check.try($q$update public.product_preferences set option_id = (select opt_r from rls_check.ctx) where user_id = '11111111-1111-4111-8111-111111111111'$q$));
+  perform rls_check.rec('Preferences: one per member, two members', 'Kettle A=1,Kettle B=1',
+    (select string_agg(n || '=' || c, ',' order by n) from (select o.name n, count(*) c from public.product_preferences p join public.product_options o on o.id = p.option_id, rls_check.ctx x where p.item_id = x.item1 group by o.name) t));
+  perform rls_check.rec('A: preferences alone select nothing', '0', (select count(*)::text from public.product_options o, rls_check.ctx c where o.item_id = c.item1 and o.is_selected));
+  perform rls_check.rec('A: selects the final option (DB records who)', '11111111-1111-4111-8111-111111111111',
+    rls_check.val($q$with u as (update public.product_options set is_selected = true where id = (select opt_a from rls_check.ctx) returning selected_by) select selected_by::text from u$q$));
+  perform set_config('request.jwt.claims', '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}', true);
+  perform rls_check.rec('B: changing the selection keeps exactly one selected', 'ok', rls_check.try($q$update public.product_options set is_selected = true where id = (select opt_b from rls_check.ctx)$q$));
+  perform rls_check.rec('B: new selection replaced the old one', 'Kettle B', (select string_agg(o.name, ',') from public.product_options o, rls_check.ctx c where o.item_id = c.item1 and o.is_selected));
+  perform rls_check.rec('B: the earlier pick is kept as an alternative, unselected and cleared', '2,true',
+    (select (select count(*) from public.product_options o where o.item_id = c.item1)::text || ',' || (select (selected_at is null and selected_by is null)::text from public.product_options o where o.id = c.opt_a) from rls_check.ctx c));
+  perform rls_check.rec('B: selecting did not touch preferences', '2', (select count(*)::text from public.product_preferences p, rls_check.ctx c where p.item_id = c.item1));
+
+  -- Purchase coordination
+  perform set_config('request.jwt.claims', '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}', true);
+  perform rls_check.rec('A: takes on sorting the purchase', 'ok', rls_check.try($q$insert into public.purchase_coordinators (item_id, household_id) select item1, hid from rls_check.ctx$q$));
+  perform set_config('request.jwt.claims', '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}', true);
+  perform rls_check.rec('B: second claim on the same item rejected', 'error 23505', rls_check.try($q$insert into public.purchase_coordinators (item_id, household_id) select item1, hid from rls_check.ctx$q$));
+  perform rls_check.rec('B: cannot claim in A''s name', 'error 42501',
+    rls_check.try($q$insert into public.purchase_coordinators (item_id, household_id, user_id) select item2, hid, '11111111-1111-4111-8111-111111111111' from rls_check.ctx$q$));
+  perform rls_check.rec('B: cannot release A''s role', '0', rls_check.val($q$with u as (delete from public.purchase_coordinators returning 1) select count(*)::text from u$q$));
+  perform rls_check.rec('B: take-over with a stale expectation changes nothing', '0',
+    rls_check.val($q$with u as (update public.purchase_coordinators set user_id = '22222222-2222-4222-8222-222222222222' where item_id = (select item1 from rls_check.ctx) and user_id = '44444444-4444-4444-8444-444444444444' returning 1) select count(*)::text from u$q$));
+  perform rls_check.rec('B: deliberate take-over from A', '1',
+    rls_check.val($q$with u as (update public.purchase_coordinators set user_id = '22222222-2222-4222-8222-222222222222' where item_id = (select item1 from rls_check.ctx) and user_id = '11111111-1111-4111-8111-111111111111' returning 1) select count(*)::text from u$q$));
+  perform set_config('request.jwt.claims', '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}', true);
+  perform rls_check.rec('A: cannot appoint a third person while B is sorting it', 'error 42501',
+    rls_check.try($q$update public.purchase_coordinators set user_id = '33333333-3333-4333-8333-333333333333' where item_id = (select item1 from rls_check.ctx)$q$));
+  perform set_config('request.jwt.claims', '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}', true);
+  perform rls_check.rec('B: cannot hand over to a non-member', 'error 23503',
+    rls_check.try($q$update public.purchase_coordinators set user_id = '33333333-3333-4333-8333-333333333333' where item_id = (select item1 from rls_check.ctx)$q$));
+  perform rls_check.rec('B: hands over to A', '11111111-1111-4111-8111-111111111111',
+    rls_check.val($q$with u as (update public.purchase_coordinators set user_id = '11111111-1111-4111-8111-111111111111' where item_id = (select item1 from rls_check.ctx) and user_id = '22222222-2222-4222-8222-222222222222' returning user_id) select user_id::text from u$q$));
+  perform rls_check.rec('Coordination left the assignees and ownership alone', '2,to_decide',
+    (select (select count(*) from public.item_assignees a where a.item_id = c.item1)::text || ',' || (select ownership from public.items i where i.id = c.item1) from rls_check.ctx c));
+  perform set_config('request.jwt.claims', '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}', true);
+  perform rls_check.rec('A: releases own role', '1', rls_check.val($q$with u as (delete from public.purchase_coordinators returning 1) select count(*)::text from u$q$));
+
+  -- Purchase and delivery
+  perform set_config('request.jwt.claims', '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}', true);
+  perform rls_check.rec('B: records the purchase, stage and amount together', 'ordered,89.00,ORD-1,22222222-2222-4222-8222-222222222222',
+    rls_check.val($q$select (r -> 'item' ->> 'status') || ',' || (r -> 'item' ->> 'actual_price') || ',' || (r -> 'purchase' ->> 'order_reference') || ',' || (r -> 'purchase' ->> 'updated_by')
+      from public.save_item_purchase((select item1 from rls_check.ctx), null, (select opt_b from rls_check.ctx), '22222222-2222-4222-8222-222222222222', date '2026-11-12', ' ORD-1 ', null, 'delivery', date '2026-11-20', 'https://track.example/1', null, null, 'ordered', 'shopping', true, 89.00, null) r$q$));
+  perform rls_check.rec('Ordered is not complete', 'false', (select is_complete::text from public.items i, rls_check.ctx c where i.id = c.item1));
+  perform rls_check.rec('B: a duplicate submission from a stale form is refused', 'error FQ409',
+    rls_check.try($q$select public.save_item_purchase((select item1 from rls_check.ctx), null, null, null, null, 'ORD-2')$q$));
+  perform rls_check.rec('B: refused save changed nothing', 'ORD-1,1', (select order_reference || ',' || (select count(*) from public.item_purchases)::text from public.item_purchases p, rls_check.ctx c where p.item_id = c.item1));
+  perform set_config('request.jwt.claims', '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}', true);
+  perform rls_check.rec('A: stage change from a stale stage is refused', 'error FQ409',
+    rls_check.try($q$select public.save_item_purchase((select item1 from rls_check.ctx), (select updated_at from public.item_purchases), (select opt_b from rls_check.ctx), '22222222-2222-4222-8222-222222222222', date '2026-11-12', 'ORD-1', null, 'delivery', date '2026-11-20', null, null, null, 'on_the_way', 'shopping')$q$));
+  perform rls_check.rec('A: amount change from a stale amount is refused', 'error FQ409',
+    rls_check.try($q$select public.save_item_purchase((select item1 from rls_check.ctx), (select updated_at from public.item_purchases), null, null, null, null, null, null, null, null, null, null, null, null, true, 10, null)$q$));
+  perform rls_check.rec('A: buyer must be a household member', 'error 23503',
+    rls_check.try($q$select public.save_item_purchase((select item1 from rls_check.ctx), (select updated_at from public.item_purchases), null, '33333333-3333-4333-8333-333333333333')$q$));
+  perform rls_check.rec('A: purchased option must belong to that item', 'error 23503',
+    rls_check.try($q$select public.save_item_purchase((select item1 from rls_check.ctx), (select updated_at from public.item_purchases), (select opt_r from rls_check.ctx))$q$));
+  perform rls_check.rec('A: unknown delivery method rejected', 'error 23514',
+    rls_check.try($q$select public.save_item_purchase((select item1 from rls_check.ctx), (select updated_at from public.item_purchases), null, null, null, null, null, 'teleport')$q$));
+  perform rls_check.rec('A: unknown stage rejected', 'error 23514',
+    rls_check.try($q$select public.save_item_purchase((select item1 from rls_check.ctx), (select updated_at from public.item_purchases), null, null, null, null, null, null, null, null, null, null, 'bogus', 'ordered')$q$));
+  perform rls_check.rec('A: cannot edit purchase bookkeeping columns directly', 'error 42501', rls_check.try($q$update public.item_purchases set updated_by = '22222222-2222-4222-8222-222222222222'$q$));
+  perform rls_check.rec('A: cannot delete a purchase record directly', 'error 42501', rls_check.try($q$delete from public.item_purchases$q$));
+  perform rls_check.rec('A: delivery progress saved with a current version', 'on_the_way,2026-11-21,11111111-1111-4111-8111-111111111111',
+    rls_check.val($q$select (r -> 'item' ->> 'status') || ',' || (r -> 'purchase' ->> 'expected_on') || ',' || (r -> 'purchase' ->> 'updated_by')
+      from public.save_item_purchase((select item1 from rls_check.ctx), (select updated_at from public.item_purchases), (select opt_b from rls_check.ctx), '22222222-2222-4222-8222-222222222222', date '2026-11-12', 'ORD-1', null, 'delivery', date '2026-11-21', 'https://track.example/1', null, null, 'on_the_way', 'ordered') r$q$));
+  perform rls_check.rec('A: amount paid was left alone by that save', '89.00', (select actual_price::text from public.items i, rls_check.ctx c where i.id = c.item1));
+  perform rls_check.rec('A: delivered is still not complete', 'delivered,false',
+    rls_check.val($q$with u as (update public.items set status = 'delivered' where id = (select item1 from rls_check.ctx) returning status, is_complete) select status || ',' || is_complete::text from u$q$));
+  perform rls_check.rec('A: "it''s in the flat" completes the checklist item (DB records who)', 'true,11111111-1111-4111-8111-111111111111,delivered',
+    rls_check.val($q$with u as (update public.items set is_complete = true where id = (select item1 from rls_check.ctx) returning is_complete, completed_by, status) select is_complete::text || ',' || completed_by::text || ',' || status from u$q$));
+  perform rls_check.rec('A: purchase works for an item with no product options', 'ok',
+    rls_check.try($q$select public.save_item_purchase((select id from public.items where name = 'Fridge'), null, null, '11111111-1111-4111-8111-111111111111', date '2026-11-12')$q$));
+  perform rls_check.rec('A: removes the purchased option', '1', rls_check.val($q$with d as (delete from public.product_options where id = (select opt_b from rls_check.ctx) returning 1) select count(*)::text from d$q$));
+  perform rls_check.rec('A: the purchase record survives without its option', 'true',
+    (select (p.option_id is null and p.order_reference = 'ORD-1')::text from public.item_purchases p, rls_check.ctx c where p.item_id = c.item1));
+  perform rls_check.rec('A: removing an option removes only the preferences for it', 'Kettle A', (select string_agg(o.name, ',') from public.product_preferences p join public.product_options o on o.id = p.option_id, rls_check.ctx c where p.item_id = c.item1));
+
+  -- Room measurements
+  perform set_config('request.jwt.claims', '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}', true);
+  perform rls_check.rec('B: saves room measurements', '320.0,410.0',
+    rls_check.val($q$with u as (update public.rooms set width_cm = 320, length_cm = 410, measurement_notes = 'Door is 76 cm wide' where name = 'Kitchen' returning width_cm, length_cm) select width_cm::text || ',' || length_cm::text from u$q$));
+  perform rls_check.rec('B: negative room measurement rejected', 'error 23514', rls_check.try($q$update public.rooms set height_cm = -240 where name = 'Kitchen'$q$));
+
+  -- Outsider
+  perform set_config('request.jwt.claims', '{"sub":"33333333-3333-4333-8333-333333333333","role":"authenticated"}', true);
+  perform rls_check.rec('C: sees none of A''s options, preferences, coordinators or purchases', '0,0,0,0',
+    (select (select count(*) from public.product_options)::text || ',' || (select count(*) from public.product_preferences)::text || ',' || (select count(*) from public.purchase_coordinators)::text || ',' || (select count(*) from public.item_purchases)::text));
+  perform rls_check.rec('C: cannot add an option to A''s item', 'error 42501', rls_check.try($q$insert into public.product_options (household_id, item_id, name) select hid, item1, 'x' from rls_check.ctx$q$));
+  perform rls_check.rec('C: cannot attach A''s item to own household via an option', 'error 23503', rls_check.try($q$insert into public.product_options (household_id, item_id, name) select other_hid, item1, 'x' from rls_check.ctx$q$));
+  perform rls_check.rec('C: cannot edit or remove A''s options', '0,0',
+    rls_check.val($q$with u as (update public.product_options set name = 'hacked' returning 1), d as (delete from public.product_options returning 1) select (select count(*) from u)::text || ',' || (select count(*) from d)::text$q$));
+  perform rls_check.rec('C: cannot prefer A''s option', 'error 42501', rls_check.try($q$insert into public.product_preferences (item_id, household_id, option_id) select item1, hid, opt_a from rls_check.ctx$q$));
+  perform rls_check.rec('C: cannot prefer A''s option through own household', 'error 23503', rls_check.try($q$insert into public.product_preferences (item_id, household_id, option_id) select item1, other_hid, opt_a from rls_check.ctx$q$));
+  perform rls_check.rec('C: cannot claim A''s purchase', 'error 42501', rls_check.try($q$insert into public.purchase_coordinators (item_id, household_id) select item2, hid from rls_check.ctx$q$));
+  perform rls_check.rec('C: cannot record a purchase for A''s item', 'error P0002', rls_check.try($q$select public.save_item_purchase((select item1 from rls_check.ctx), null)$q$));
+  perform rls_check.rec('C: cannot insert a purchase row for A''s item', 'error 42501', rls_check.try($q$insert into public.item_purchases (item_id, household_id) select item2, hid from rls_check.ctx$q$));
+  perform rls_check.rec('C: storage rule denies A''s product photos', 'false', (select private.is_household_member(private.path_household(hid::text || '/products/kettle-1.webp'))::text from rls_check.ctx));
+  perform set_config('request.jwt.claims', '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}', true);
+  perform rls_check.rec('B: storage rule allows own household''s product photos', 'true', (select private.is_household_member(private.path_household(hid::text || '/products/kettle-1.webp'))::text from rls_check.ctx));
+
+  -- A member who leaves takes their preference and coordination with them, nothing else.
+  -- (D is re-added directly so the invite's remaining uses are untouched for the checks below.)
+  perform set_config('role', 'none', true);
+  insert into public.household_members (household_id, user_id) select hid, '44444444-4444-4444-8444-444444444444' from rls_check.ctx;
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claims', '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}', true);
+  insert into public.product_preferences (item_id, household_id, option_id) select item1, hid, opt_a from rls_check.ctx;
+  insert into public.purchase_coordinators (item_id, household_id) select item2, hid from rls_check.ctx;
+  perform public.save_item_purchase((select item2 from rls_check.ctx), null, null, '44444444-4444-4444-8444-444444444444', date '2026-11-12');
+  delete from public.household_members where user_id = '44444444-4444-4444-8444-444444444444';
+  perform set_config('role', 'none', true);
+  perform rls_check.rec('After D leaves: preference and coordination gone; purchase kept without a buyer; options kept', '0,0,true,2',
+    (select (select count(*) from public.product_preferences where user_id = '44444444-4444-4444-8444-444444444444')::text || ','
+         || (select count(*) from public.purchase_coordinators)::text || ','
+         || (select (p.purchased_by is null and p.purchased_on = date '2026-11-12')::text from public.item_purchases p where p.item_id = c.item2) || ','
+         || (select count(*) from public.product_options o where o.household_id = c.hid)::text
+       from rls_check.ctx c));
+  perform set_config('role', 'authenticated', true);
+
   -- ===== Capacity: fill the house =====
   perform set_config('role', 'none', true);
   update public.households set member_limit = 2 where id = (select hid from rls_check.ctx);
@@ -186,6 +348,11 @@ values
   perform rls_check.rec('anon: votes denied', 'error 42501', rls_check.try('select * from public.wishlist_votes'));
   perform rls_check.rec('anon: create_household denied', 'error 42501', rls_check.try($q$select public.create_household('x')$q$));
   perform rls_check.rec('anon: get_household_invites denied', 'error 42501', rls_check.try($q$select * from public.get_household_invites(gen_random_uuid())$q$));
+  perform rls_check.rec('anon: product options denied', 'error 42501', rls_check.try('select * from public.product_options'));
+  perform rls_check.rec('anon: product preferences denied', 'error 42501', rls_check.try('select * from public.product_preferences'));
+  perform rls_check.rec('anon: purchase coordinators denied', 'error 42501', rls_check.try('select * from public.purchase_coordinators'));
+  perform rls_check.rec('anon: purchases denied', 'error 42501', rls_check.try('select * from public.item_purchases'));
+  perform rls_check.rec('anon: save_item_purchase denied', 'error 42501', rls_check.try($q$select public.save_item_purchase(gen_random_uuid())$q$));
   perform rls_check.rec('anon: private helpers not callable', 'error 42501', rls_check.try($q$select private.is_household_member(gen_random_uuid())$q$));
 
   -- ===== Storage policy wiring (expressions verified above) =====
@@ -194,6 +361,20 @@ values
     (select count(*)::text from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname like 'household media:%'
        and coalesce(qual, with_check) like '%is_household_member%path_household%'));
   perform rls_check.rec('Storage: household-media bucket is private', 'false', (select public::text from storage.buckets where id = 'household-media'));
+  perform rls_check.rec('Phase 4: RLS enabled on all four new tables', '4',
+    (select count(*)::text from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relrowsecurity
+       and c.relname in ('product_options', 'product_preferences', 'purchase_coordinators', 'item_purchases')));
+  perform rls_check.rec('Phase 4: new tables are in the realtime publication', '4',
+    (select count(*)::text from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public'
+       and tablename in ('product_options', 'product_preferences', 'purchase_coordinators', 'item_purchases')));
+  perform rls_check.rec('Phase 4: no new SECURITY DEFINER functions', '0',
+    (select count(*)::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace where p.prosecdef
+       and ((n.nspname = 'public' and p.proname = 'save_item_purchase')
+         or (n.nspname = 'private' and p.proname in ('product_options_guard', 'purchase_coordinators_guard', 'item_purchases_guard')))));
+  perform rls_check.rec('Phase 4: API roles cannot truncate or bypass the new tables', '0',
+    (select count(*)::text from information_schema.table_privileges where table_schema = 'public'
+       and table_name in ('product_options', 'product_preferences', 'purchase_coordinators', 'item_purchases')
+       and grantee in ('anon', 'authenticated') and privilege_type in ('TRUNCATE', 'TRIGGER', 'REFERENCES')));
 
   -- ===== cleanup (as postgres) =====
   perform set_config('role', 'none', true);
@@ -212,7 +393,7 @@ from rls_check.results order by n;
 -- Make CI fail instead of accepting a printed FAIL row as a successful SQL command.
 do $$
 begin
-  if (select count(*) from rls_check.results) <> 80
+  if (select count(*) from rls_check.results) <> 163
      or exists (select 1 from rls_check.results where expected is distinct from actual) then
     raise exception 'RLS verification failed';
   end if;

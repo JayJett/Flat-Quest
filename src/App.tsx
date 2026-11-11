@@ -18,6 +18,7 @@ const HomePage = lazy(() => import('@/pages/Home').then((m) => ({ default: m.Hom
 const ProfilePage = lazy(() => import('@/pages/Profile').then((m) => ({ default: m.ProfilePage })))
 const RoomDetailPage = lazy(() => import('@/pages/RoomDetail').then((m) => ({ default: m.RoomDetailPage })))
 const RoomsPage = lazy(() => import('@/pages/Rooms').then((m) => ({ default: m.RoomsPage })))
+const ShoppingPage = lazy(() => import('@/pages/Shopping').then((m) => ({ default: m.ShoppingPage })))
 const SettingsPage = lazy(() => import('@/pages/Settings').then((m) => ({ default: m.SettingsPage })))
 const SignInPage = lazy(() => import('@/pages/SignIn').then((m) => ({ default: m.SignInPage })))
 const JoinPage = lazy(() => import('@/pages/Welcome').then((m) => ({ default: m.JoinPage })))
@@ -59,6 +60,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <HomePage /> },
           { path: 'rooms', element: <RoomsPage /> },
+          { path: 'rooms/shopping', element: <ShoppingPage /> },
           { path: 'rooms/:roomId', element: <RoomDetailPage /> },
           { path: 'wishlist', element: <WishlistPage /> },
           { path: 'flatmates', element: <FlatmatesPage /> },

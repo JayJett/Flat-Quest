@@ -1,4 +1,4 @@
-import { Check, ExternalLink, Trash2 } from 'lucide-react'
+import { Check, ChevronRight, ExternalLink, Trash2 } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useId, useState } from 'react'
 import { useAuth } from '@/auth/AuthProvider'
@@ -14,6 +14,9 @@ import {
   type Status,
 } from '@/lib/domain'
 import { useHousehold, type ItemPatch } from '@/household/HouseholdProvider'
+import { optionsLine } from '@/lib/shopping'
+import { ShoppingSheet } from '@/shopping/ShoppingSheet'
+import { useShopping } from '@/shopping/ShoppingProvider'
 import { Avatar } from './Avatar'
 import { assigneeMembers, responsibilityLabel } from './ItemRow'
 import { ConfirmSheet, Sheet } from './Sheet'
@@ -27,6 +30,8 @@ interface ItemSheetProps {
   item: Item | null
   /** Default room when creating. */
   roomId?: string
+  /** Set when this sheet was opened from the shopping sheet, which already shows all of that. */
+  hideShoppingLink?: boolean
 }
 
 interface Draft {
@@ -84,18 +89,20 @@ function normaliseUrl(v: string): string | null | 'invalid' {
   }
 }
 
-export function ItemSheet({ open, onClose, item, roomId }: ItemSheetProps) {
+export function ItemSheet({ open, onClose, item, roomId, hideShoppingLink }: ItemSheetProps) {
   const [busy, setBusy] = useState(false)
   return (
     <Sheet busy={busy} open={open} onClose={onClose} title={item ? 'Item details' : 'Add an item'}>
-      {open && <ItemForm key={item?.id ?? 'new'} item={item} roomId={roomId} onDone={onClose} onBusy={setBusy} />}
+      {open && <ItemForm key={item?.id ?? 'new'} item={item} roomId={roomId} onDone={onClose} onBusy={setBusy} hideShoppingLink={hideShoppingLink} />}
     </Sheet>
   )
 }
 
-function ItemForm({ item, roomId, onDone, onBusy }: { item: Item | null; roomId?: string; onDone: () => void; onBusy: (busy: boolean) => void }) {
+function ItemForm({ item, roomId, onDone, onBusy, hideShoppingLink }: { item: Item | null; roomId?: string; onDone: () => void; onBusy: (busy: boolean) => void; hideShoppingLink?: boolean }) {
   const { user } = useAuth()
   const { items, rooms, members, memberById, createItem, updateItem, deleteItem, setAssignees } = useHousehold()
+  const shopping = useShopping()
+  const [shoppingOpen, setShoppingOpen] = useState(false)
   const toast = useToast()
   const ids = { name: useId(), desc: useId(), room: useId(), owner: useId(), est: useId(), act: useId(), url: useId(), notes: useId() }
   const [savedItem, setSavedItem] = useState<Item | null>(item)
@@ -198,6 +205,8 @@ function ItemForm({ item, roomId, onDone, onBusy }: { item: Item | null; roomId?
     if (!item) return
     setDeleting(true)
     onBusy(true)
+    // Its product options go with it (database cascade); their photo files need removing too.
+    const photos = shopping.photoPathsForItem(item.id)
     const res = await deleteItem(item.id)
     setDeleting(false)
     onBusy(false)
@@ -206,6 +215,7 @@ function ItemForm({ item, roomId, onDone, onBusy }: { item: Item | null; roomId?
       toast.error(res.error)
       return
     }
+    void shopping.removeFiles(photos)
     toast.show(`Removed “${item.name}”`)
     onDone()
   }
@@ -233,6 +243,20 @@ function ItemForm({ item, roomId, onDone, onBusy }: { item: Item | null; roomId?
         </span>
         <Switch checked={draft.is_complete} onChange={(v) => set('is_complete', v)} label="It’s in the flat" />
       </label>
+
+      {item && !hideShoppingLink && (
+        <button
+          type="button"
+          onClick={() => setShoppingOpen(true)}
+          className="pressable bg-surface-2 active:bg-surface-3 -mt-3 flex min-h-14 items-center justify-between gap-3 rounded-[var(--radius-control)] px-4 py-2.5 text-left"
+        >
+          <span className="min-w-0">
+            <span className="block font-semibold">Shopping</span>
+            <span className="text-ink-2 block truncate text-[14px]">{shoppingSummary(item, shopping, memberById, user?.id)}</span>
+          </span>
+          <ChevronRight size={20} className="text-ink-3 shrink-0" aria-hidden />
+        </button>
+      )}
 
       <fieldset>
         <legend className="mb-1 text-[14px] font-semibold">Who’s on it?</legend>
@@ -409,6 +433,8 @@ function ItemForm({ item, roomId, onDone, onBusy }: { item: Item | null; roomId?
         </Button>
       </div>
 
+      {item && !hideShoppingLink && <ShoppingSheet open={shoppingOpen} itemId={item.id} onClose={() => setShoppingOpen(false)} fromItemDetails />}
+
       <ConfirmSheet
         open={confirmDelete}
         title="Delete this item?"
@@ -421,6 +447,23 @@ function ItemForm({ item, roomId, onDone, onBusy }: { item: Item | null; roomId?
       />
     </form>
   )
+}
+
+/** One line for the item sheet's Shopping row: who's sorting it, and what there is to compare. */
+function shoppingSummary(
+  item: Item,
+  shopping: ReturnType<typeof useShopping>,
+  memberById: ReturnType<typeof useHousehold>['memberById'],
+  myId?: string,
+): string {
+  const coordinator = shopping.coordinatorByItem.get(item.id)
+  const who = coordinator
+    ? coordinator.user_id === myId
+      ? 'You’re sorting this'
+      : `${memberById.get(coordinator.user_id)?.profile.display_name ?? 'A flatmate'} is sorting this`
+    : ''
+  const parts = [who, optionsLine(shopping.optionsByItem.get(item.id) ?? [])].filter(Boolean)
+  return parts.length ? parts.join(' · ') : 'Compare products, track the order'
 }
 
 function PersonToggle({

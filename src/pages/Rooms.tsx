@@ -8,7 +8,8 @@ import { RoomSheet } from '@/components/RoomSheet'
 import { RoomTile } from '@/components/RoomTile'
 import { Sheet } from '@/components/Sheet'
 import { useToast } from '@/components/Toast'
-import { EmptyState, IconButton, Segmented } from '@/components/ui'
+import { RoomsViewSwitch } from '@/components/RoomsViewSwitch'
+import { EmptyState, IconButton } from '@/components/ui'
 import { RoomIcon } from '@/design/icons'
 import { roomColor } from '@/design/tokens'
 import { PRIORITY_RANK, type Item } from '@/lib/domain'
@@ -19,7 +20,7 @@ type View = 'rooms' | 'unclaimed'
 
 export function RoomsPage() {
   const { rooms, items } = useHousehold()
-  const [params, setParams] = useSearchParams()
+  const [params] = useSearchParams()
   const view: View = params.get('filter') === 'unclaimed' ? 'unclaimed' : 'rooms'
   const [creating, setCreating] = useState(false)
   const [reordering, setReordering] = useState(false)
@@ -68,17 +69,7 @@ export function RoomsPage() {
           </p>
         </div>
 
-        <div className="mb-5 max-w-sm">
-          <Segmented
-            label="View"
-            value={view}
-            onChange={(v) => setParams(v === 'unclaimed' ? { filter: 'unclaimed' } : {}, { replace: true })}
-            options={[
-              { value: 'rooms', label: 'All rooms' },
-              { value: 'unclaimed', label: 'Unclaimed', count: unclaimed.length },
-            ]}
-          />
-        </div>
+        <RoomsViewSwitch view={view} />
 
         {view === 'rooms' ? (
           rooms.length === 0 ? (

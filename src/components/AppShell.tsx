@@ -17,6 +17,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/AuthProvider'
 import { ProfileIcon } from '@/design/icons'
 import { useHousehold } from '@/household/HouseholdProvider'
+import { ShoppingProvider } from '@/shopping/ShoppingProvider'
 import { ConnectionStatus } from './ConnectionStatus'
 import { Avatar } from './Avatar'
 import { useFocusTrap } from './Sheet'
@@ -49,6 +50,7 @@ export function AppShell() {
   }, [location.pathname])
 
   return (
+    <ShoppingProvider>
     <TourProvider>
     <DrawerContext.Provider value={{ open: () => setDrawerOpen(true) }}>
       <div className="lg:flex" style={{ paddingLeft: 'var(--safe-left)', paddingRight: 'var(--safe-right)' }}>
@@ -65,6 +67,7 @@ export function AppShell() {
       <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </DrawerContext.Provider>
     </TourProvider>
+    </ShoppingProvider>
   )
 }
 
