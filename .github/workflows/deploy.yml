@@ -5,6 +5,8 @@ name: Build and publish to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -13,7 +15,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -35,16 +37,39 @@ jobs:
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
         run: npm run build
+      - name: Install test browsers
+        run: npx playwright install --with-deps chromium webkit
+      - name: Browser regression tests (isolated fixtures)
+        run: npm run test:browser
       - name: Let deep links (e.g. /rooms/…) open the app
         run: cp dist/index.html dist/404.html && touch dist/.nojekyll
       - uses: actions/configure-pages@v5
+        if: github.ref == 'refs/heads/main'
       - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main'
         with:
           path: dist
 
+  database-tests:
+    name: Local database access tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.81.3
+      - name: Start disposable local Supabase (never linked to production)
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
+      - name: Verify all access checks and rollback fixtures
+        run: psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -v ON_ERROR_STOP=1 -f supabase/tests/rls_verification.sql
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup
+
   deploy:
     name: Publish
-    needs: build
+    needs: [build, database-tests]
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

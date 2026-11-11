@@ -13,6 +13,7 @@ import { useAuth } from '@/auth/AuthProvider'
 import { useToast } from '@/components/Toast'
 import type { HouseholdMemberRow, HouseholdRow, ItemAssigneeRow, ItemRow, ProfileRow, RoomRow } from '@/lib/database.types'
 import { toItem, type Household, type Item, type Member, type Profile, type Room } from '@/lib/domain'
+import { completionMilestone } from '@/lib/celebrations'
 import { errorMessage, supabase } from '@/lib/supabase'
 
 export type LoadState = 'loading' | 'no-household' | 'ready' | 'error'
@@ -55,7 +56,7 @@ interface HouseholdState {
   reload: () => Promise<void>
   // Items
   createItem: (input: ItemInput) => Promise<Result<Item>>
-  updateItem: (id: string, patch: ItemPatch) => Promise<Result<Item>>
+  updateItem: (id: string, patch: ItemPatch, expectedVersion?: string) => Promise<Result<Item>>
   deleteItem: (id: string) => Promise<Result>
   /** Replace who is responsible for an item (0 = unclaimed, 2+ = shared). Optimistic. */
   setAssignees: (itemId: string, userIds: string[]) => Promise<Result>
@@ -103,6 +104,8 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   const pendingAssign = useRef(new Map<string, number>())
   const householdIdRef = useRef<string | null>(null)
   const lastLoad = useRef(0)
+  const celebrated = useRef(new Set<string>())
+  const pendingSnapshots = useRef(new Map<string, Item>())
 
   const markPending = (id: string, delta: 1 | -1) => {
     const n = (pending.current.get(id) ?? 0) + delta
@@ -261,7 +264,9 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
 
     channel = channel
       .on('postgres_changes', { event: '*', schema: 'public', table: 'items', filter: `household_id=eq.${householdId}` }, onItem)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'items' }, onItem)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `household_id=eq.${householdId}` }, onRoom)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'rooms' }, onRoom)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, onProfile)
       .on(
         'postgres_changes',
@@ -339,6 +344,8 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   }, [assignments])
 
   const setAssignees = useCallback<HouseholdState['setAssignees']>(async (itemId, userIds) => {
+    if (!navigator.onLine) return { ok: false, error: 'You’re offline. Reconnect before changing assignments.' }
+    if (pendingAssign.current.has(itemId)) return { ok: false, error: 'This assignment is still saving. Try again in a moment.' }
     const before = assignmentsRef.current.get(itemId) ?? []
     const unique = [...new Set(userIds)]
     const n = (pendingAssign.current.get(itemId) ?? 0) + 1
@@ -358,26 +365,41 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     return { ok: true, data: undefined }
   }, [])
 
-  const updateItem = useCallback<HouseholdState['updateItem']>(async (id, patch) => {
+  const updateItem = useCallback<HouseholdState['updateItem']>(async (id, patch, expectedVersion) => {
+    if (!navigator.onLine) return { ok: false, error: 'You’re offline. Reconnect before saving changes.' }
+    if (pending.current.has(id)) return { ok: false, error: 'This item is still saving. Try again in a moment.' }
     const before = itemsRef.current.find((i) => i.id === id)
     if (!before) return { ok: false, error: 'This item no longer exists.' }
+    pendingSnapshots.current.set(id, before)
     const previous: ItemPatch = {}
     for (const k of Object.keys(patch) as (keyof ItemPatch)[]) {
       ;(previous as Record<string, unknown>)[k] = before[k]
     }
     markPending(id, 1)
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)))
-    const { data, error } = await supabase.from('items').update(patch).eq('id', id).select().single()
+    let query = supabase.from('items').update(patch).eq('id', id)
+    if (expectedVersion) query = query.eq('updated_at', expectedVersion)
+    const { data, error } = await query.select().maybeSingle()
     markPending(id, -1)
     if (error || !data) {
+      pendingSnapshots.current.delete(id)
       // Roll back only the fields this write touched.
       setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...previous } : i)))
-      return { ok: false, error: errorMessage(error, 'Couldn’t save that change.') }
+      return { ok: false, error: error ? errorMessage(error, 'Couldn’t save that change.') : 'Someone changed this item. Close and reopen it to review the latest version.' }
     }
     const item = toItem(data)
+    const milestone = completionMilestone(itemsRef.current.map((i) => pendingSnapshots.current.get(i.id) ?? i), item)
+    pendingSnapshots.current.delete(id)
+    itemsRef.current = itemsRef.current.map((i) => i.id === id ? item : i)
+    const milestoneKey = item.room_id + ':' + milestone
+    if (milestone && !celebrated.current.has(milestoneKey)) {
+      celebrated.current.add(milestoneKey)
+      const room = rooms.find((r) => r.id === item.room_id)
+      toast.success(milestone === 100 ? (room?.name ?? 'Room') + ' is ready. Nice work, team!' : (room?.name ?? 'Room') + ' is ' + milestone + '% ready')
+    }
     if (!pending.current.has(id)) setItems((prev) => prev.map((i) => (i.id === id ? item : i)))
     return { ok: true, data: item }
-  }, [])
+  }, [rooms, toast])
 
   const deleteItem = useCallback<HouseholdState['deleteItem']>(async (id) => {
     const before = itemsRef.current.find((i) => i.id === id)

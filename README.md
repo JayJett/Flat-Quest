@@ -5,7 +5,7 @@ A private, collaborative home-furnishing app for our flat. Flatmates see everyth
 Mobile-first React web app backed by Supabase (Auth, Postgres with row level security, Storage, Realtime).
 
 > **New to this? Start with [`SETUP_GUIDE.md`](SETUP_GUIDE.md)**, which gives click-by-click setup instructions.
-> Status and verification details: [Phase 1](reports/PHASE_01_IMPLEMENTATION.md) · [Phase 2](reports/PHASE_02_IMPLEMENTATION.md)
+> Status and verification details: [Phase 1](reports/PHASE_01_IMPLEMENTATION.md) · [Phase 2](reports/PHASE_02_IMPLEMENTATION.md) · [Phase 3](reports/PHASE_03_IMPLEMENTATION.md)
 
 ## Stack
 
@@ -147,3 +147,7 @@ data/           Source checklist + wishlist CSVs from the Google Sheet
 tests/          Vitest unit tests
 reports/        Phase reports and screenshots
 ```
+
+### Phase 3 regression checks
+
+Build with `BASE_PATH=/Flat-Quest/`, run `npx playwright install chromium webkit`, then `npm run test:browser`. The browser suite intercepts Supabase with invented fixtures. The Pages workflow runs this suite and the 80-check RLS script against a disposable local Supabase stack before publishing. The test SQL rolls back all fixtures.

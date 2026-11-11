@@ -14,7 +14,8 @@
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "data:checklist": "node scripts/csv-to-seed.mjs"
+    "data:checklist": "node scripts/csv-to-seed.mjs",
+    "test:browser": "playwright test"
   },
   "dependencies": {
     "@fontsource-variable/plus-jakarta-sans": "5.3.0",
@@ -27,6 +28,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.65.0",
     "@tailwindcss/vite": "4.3.5",
     "@testing-library/react": "16.3.3",
     "@types/node": "26.6.6",

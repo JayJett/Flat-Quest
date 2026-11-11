@@ -85,18 +85,20 @@ function normaliseUrl(v: string): string | null | 'invalid' {
 }
 
 export function ItemSheet({ open, onClose, item, roomId }: ItemSheetProps) {
+  const [busy, setBusy] = useState(false)
   return (
-    <Sheet open={open} onClose={onClose} title={item ? 'Item details' : 'Add an item'}>
-      {open && <ItemForm key={item?.id ?? 'new'} item={item} roomId={roomId} onDone={onClose} />}
+    <Sheet busy={busy} open={open} onClose={onClose} title={item ? 'Item details' : 'Add an item'}>
+      {open && <ItemForm key={item?.id ?? 'new'} item={item} roomId={roomId} onDone={onClose} onBusy={setBusy} />}
     </Sheet>
   )
 }
 
-function ItemForm({ item, roomId, onDone }: { item: Item | null; roomId?: string; onDone: () => void }) {
+function ItemForm({ item, roomId, onDone, onBusy }: { item: Item | null; roomId?: string; onDone: () => void; onBusy: (busy: boolean) => void }) {
   const { user } = useAuth()
-  const { rooms, members, memberById, createItem, updateItem, deleteItem, setAssignees } = useHousehold()
+  const { items, rooms, members, memberById, createItem, updateItem, deleteItem, setAssignees } = useHousehold()
   const toast = useToast()
   const ids = { name: useId(), desc: useId(), room: useId(), owner: useId(), est: useId(), act: useId(), url: useId(), notes: useId() }
+  const [savedItem, setSavedItem] = useState<Item | null>(item)
   const [draft, setDraft] = useState<Draft>(() => toDraft(item, roomId ?? rooms[0]?.id ?? ''))
   const [errors, setErrors] = useState<Partial<Record<keyof Draft, string>>>({})
   const [saving, setSaving] = useState(false)
@@ -125,6 +127,12 @@ function ItemForm({ item, roomId, onDone }: { item: Item | null; roomId?: string
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (saving) return
+    const current = savedItem ? items.find((i) => i.id === savedItem.id) : null
+    if (savedItem && (!current || current.updated_at !== savedItem.updated_at || current.assignees.slice().sort().join(',') !== savedItem.assignees.slice().sort().join(','))) {
+      toast.error('This item changed while you were editing. Close and reopen it to review the latest version. Your draft is still here.')
+      return
+    }
     const errs: typeof errors = {}
     const name = draft.name.trim()
     if (!name) errs.name = 'Give it a name.'
@@ -154,23 +162,30 @@ function ItemForm({ item, roomId, onDone }: { item: Item | null; roomId?: string
       notes: draft.notes.trim() || null,
     }
     setSaving(true)
-    const res = item ? await updateItem(item.id, payload) : await createItem(payload)
+    onBusy(true)
+    const patch = savedItem ? Object.fromEntries(Object.entries(payload).filter(([key, value]) => savedItem[key as keyof Item] !== value)) as ItemPatch : payload
+    const res = savedItem ? await updateItem(savedItem.id, patch, savedItem.updated_at) : await createItem(payload)
     if (!res.ok) {
       setSaving(false)
+      onBusy(false)
       toast.error(res.error)
       return
     }
-    const before = item?.assignees ?? []
+    const before = savedItem?.assignees ?? []
+    // Retain the created ID after an assignment failure so retry cannot duplicate an item.
+    setSavedItem({ ...res.data, assignees: before })
     const changed = before.length !== draft.assignees.length || before.some((u) => !draft.assignees.includes(u))
     if (changed) {
       const a = await setAssignees(res.data.id, draft.assignees)
       if (!a.ok) {
         setSaving(false)
+        onBusy(false)
         toast.error(a.error)
         return
       }
     }
     setSaving(false)
+    onBusy(false)
     toast.success(item ? 'Saved' : `Added “${name}”`)
     onDone()
   }
@@ -178,8 +193,10 @@ function ItemForm({ item, roomId, onDone }: { item: Item | null; roomId?: string
   const remove = async () => {
     if (!item) return
     setDeleting(true)
+    onBusy(true)
     const res = await deleteItem(item.id)
     setDeleting(false)
+    onBusy(false)
     setConfirmDelete(false)
     if (!res.ok) {
       toast.error(res.error)

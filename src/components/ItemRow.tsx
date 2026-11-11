@@ -80,6 +80,7 @@ export function ItemRow({ item, onOpen, roomName }: ItemRowProps) {
         tabIndex={0}
         onClick={() => onOpen(item)}
         onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
             onOpen(item)

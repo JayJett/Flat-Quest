@@ -5,15 +5,15 @@
 --
 -- Creates throwaway auth users and two test flats, impersonates each user
 -- (request.jwt.claims + role), records expected vs actual outcomes, then deletes
--- everything it created. Results are kept in the small private schema
--- `rls_check` (recreated on every run) so they can be shown at the end; nothing
--- in it is exposed to the app. Remove it any time with: drop schema rls_check cascade;
+-- everything it created. The transaction rolls back all test objects after returning results.
+-- Run the entire file in one connection; do not execute selected statements.
 --
 -- The checks run inside ONE statement (a DO block) so they work in editors that
 -- don't keep temporary tables or settings between statements.
 --
 -- Users: A = owner, B = joins via invite, D = joins then leaves, C = outsider with own house.
 
+begin;
 drop schema if exists rls_check cascade;
 create schema rls_check;
 revoke all on schema rls_check from public;
@@ -24,9 +24,9 @@ create table rls_check.ctx (hid uuid, code text, other_hid uuid, item1 uuid, ite
 grant all on rls_check.results, rls_check.ctx to authenticated, anon;
 grant usage on sequence rls_check.results_n_seq to authenticated, anon;
 
-create function rls_check.rec(t text, e text, a text) returns void language sql as
+create function rls_check.rec(t text, e text, a text) returns void language sql set search_path = pg_catalog, public as
 $$ insert into rls_check.results (test, expected, actual) values (t, e, coalesce(a, 'NULL')) $$;
-create function rls_check.try(q text) returns text language plpgsql as $$
+create function rls_check.try(q text) returns text language plpgsql set search_path = pg_catalog, public as $$
 begin execute q; return 'ok'; exception when others then return 'error ' || sqlstate; end $$;
 create function rls_check.val(q text) returns text language plpgsql as $$
 declare v text; begin execute q into v; return v; exception when others then return 'error ' || sqlstate; end $$;
@@ -208,3 +208,13 @@ $test$;
 
 select n, case when expected = actual then 'PASS' else 'FAIL' end as result, test, expected, actual
 from rls_check.results order by n;
+
+-- Make CI fail instead of accepting a printed FAIL row as a successful SQL command.
+do $$
+begin
+  if (select count(*) from rls_check.results) <> 80
+     or exists (select 1 from rls_check.results where expected is distinct from actual) then
+    raise exception 'RLS verification failed';
+  end if;
+end $$;
+rollback;
