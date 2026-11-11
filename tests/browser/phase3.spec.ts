@@ -124,6 +124,22 @@ test('first-run tour opens and can be skipped', async ({ page }) => {
   await expect(page.getByText('Welcome to Flat Quest!', { exact: true })).toBeHidden()
 })
 
+test('all six tour steps survive lazy navigation and stay on screen', async ({ page }) => {
+  await mockFlat(page, true)
+  await page.goto('./')
+  for (const [index, title] of ['Welcome to Flat Quest!', 'Our progress', 'Explore rooms', 'Claim and share', 'Wishlist', 'Your account'].entries()) {
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByRole('heading', { name: title, exact: true })).toBeVisible()
+    await expect.poll(async () => {
+      const bounds = await dialog.boundingBox()
+      const viewport = page.viewportSize()!
+      return Boolean(bounds && bounds.x >= -1 && bounds.y >= -1 && bounds.x + bounds.width <= viewport.width + 1 && bounds.y + bounds.height <= viewport.height + 1)
+    }).toBe(true)
+    await dialog.getByRole('button', { name: index === 0 ? 'Show me' : index === 5 ? 'Start exploring' : 'Next', exact: true }).click()
+  }
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+})
+
 test.describe('offline fallback', () => {
   test.use({ serviceWorkers: 'allow' })
 

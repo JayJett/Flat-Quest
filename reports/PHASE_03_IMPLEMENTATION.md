@@ -43,8 +43,8 @@ No application schema migration, household import, user modification or Storage 
 - Baseline: 45 unit tests passed; original build had one 870.07 kB JS chunk (258.86 kB gzip).
 - Current local lint, TypeScript/production build and 57 unit tests pass.
 - Desktop browser regression checks pass; small iPhone WebKit checks pass (10, with offline-worker integration reserved for Chromium).
-- Final local browser run: **32 passed, 1 explicitly skipped** (WebKit offline-worker integration; Chromium covers it). Pull-request CI, isolated database suite and deployment results are recorded below once complete.
-- Split build entry plus shared preload: 750.32 kB raw / 229.72 kB gzip, about **11.3% less initial compressed JS** than the baseline. Individual route chunks load on demand; this is a build-size measurement, not a real-device speed claim.
+- Local browser verification (32 full-suite checks plus three added tour checks; nine affected checks re-run after review): **35 scenarios passed, 1 explicitly skipped** (WebKit offline-worker integration; Chromium covers it). The isolated database job passed all 80 assertions in [Actions run 42969034109](https://github.com/JayJett/Flat-Quest/actions/runs/42969034109). Final-head CI and deployment are recorded below once complete.
+- Split build entry plus shared preload: 750.37 kB raw / 229.73 kB gzip, about **11.3% less initial compressed JS** than the baseline. Individual route chunks load on demand; this is a build-size measurement, not a real-device speed claim.
 - Production build uses `/Flat-Quest/`, matching GitHub Pages; tests cover direct route loads with this sub-path.
 - No physical iPhone, Add to Home Screen installation, actual pinch gestures or two real household devices were used. Browser tests use invented “Our Flat”/“Alex” records and never intentional writes to live household data.
 

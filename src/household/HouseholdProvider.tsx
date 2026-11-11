@@ -385,6 +385,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       pendingSnapshots.current.delete(id)
       // Roll back only the fields this write touched.
       setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...previous } : i)))
+      if (!error && householdIdRef.current) void loadHouseholdData(householdIdRef.current).catch(() => undefined)
       return { ok: false, error: error ? errorMessage(error, 'Couldn’t save that change.') : 'Someone changed this item. Close and reopen it to review the latest version.' }
     }
     const item = toItem(data)
@@ -399,7 +400,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     }
     if (!pending.current.has(id)) setItems((prev) => prev.map((i) => (i.id === id ? item : i)))
     return { ok: true, data: item }
-  }, [rooms, toast])
+  }, [rooms, toast, loadHouseholdData])
 
   const deleteItem = useCallback<HouseholdState['deleteItem']>(async (id) => {
     const before = itemsRef.current.find((i) => i.id === id)

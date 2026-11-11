@@ -164,7 +164,11 @@ function ItemForm({ item, roomId, onDone, onBusy }: { item: Item | null; roomId?
     setSaving(true)
     onBusy(true)
     const patch = savedItem ? Object.fromEntries(Object.entries(payload).filter(([key, value]) => savedItem[key as keyof Item] !== value)) as ItemPatch : payload
-    const res = savedItem ? await updateItem(savedItem.id, patch, savedItem.updated_at) : await createItem(payload)
+    const res = savedItem
+      ? Object.keys(patch).length > 0
+        ? await updateItem(savedItem.id, patch, savedItem.updated_at)
+        : { ok: true as const, data: savedItem }
+      : await createItem(payload)
     if (!res.ok) {
       setSaving(false)
       onBusy(false)
