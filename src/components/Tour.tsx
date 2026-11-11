@@ -14,8 +14,8 @@ interface Step {
   id: string
   title: string
   body: string
-  /** data-tour value to spotlight; omitted = centred card. */
-  target?: string
+  /** data-tour value(s) to spotlight, in order of preference; omitted = centred card. */
+  target?: string | string[]
   /** Route to show first; may be a function of household data. */
   route?: string | ((ctx: { firstRoomId?: string }) => string | undefined)
 }
@@ -44,7 +44,8 @@ const STEPS: Step[] = [
     id: 'claim',
     title: 'Claim and share',
     body: 'Tap Claim if you’re bringing something. Open an item to share it with flatmates.',
-    target: 'item-row',
+    // Prefer an unclaimed item so the Claim button is visible.
+    target: ['item-row-claim', 'item-row'],
     route: ({ firstRoomId }) => (firstRoomId ? `/rooms/${firstRoomId}` : undefined),
   },
   {
@@ -58,20 +59,23 @@ const STEPS: Step[] = [
     title: 'Your account',
     body: 'Tap your photo to customise your profile and open the menu.',
     target: 'profile',
+    // Sub-pages show a back arrow instead of the avatar, so return Home first.
+    route: '/',
   },
 ]
 
 const TourContext = createContext<{ start: () => void }>({ start: () => undefined })
 export const useTour = () => useContext(TourContext)
 
-function findTarget(name: string): HTMLElement | null {
-  const els = [...document.querySelectorAll<HTMLElement>(`[data-tour="${name}"]`)]
-  return (
-    els.find((el) => {
-      const r = el.getBoundingClientRect()
-      return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden'
-    }) ?? null
-  )
+function findTarget(target: string | string[]): HTMLElement | null {
+  for (const name of Array.isArray(target) ? target : [target]) {
+    const el = [...document.querySelectorAll<HTMLElement>(`[data-tour="${name}"]`)].find((e) => {
+      const r = e.getBoundingClientRect()
+      return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden'
+    })
+    if (el) return el
+  }
+  return null
 }
 
 export function TourProvider({ children }: { children: ReactNode }) {
@@ -155,6 +159,19 @@ function TourOverlay({
   const [rect, setRect] = useState<Rect | null>(null)
   const [ready, setReady] = useState(false)
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight })
+  const [cardH, setCardH] = useState(240)
+  // Measure whichever card is mounted (AnimatePresence swaps elements between steps).
+  const observer = useRef<ResizeObserver | null>(null)
+  const setCardEl = useCallback((el: HTMLDivElement | null) => {
+    cardRef.current = el
+    observer.current?.disconnect()
+    if (!el) return
+    observer.current = new ResizeObserver(() => {
+      if (el.offsetHeight > 0) setCardH(el.offsetHeight)
+    })
+    observer.current.observe(el)
+  }, [])
+  useEffect(() => () => observer.current?.disconnect(), [])
   const [dir, setDir] = useState<1 | -1>(1)
   const step = STEPS[index]!
   const isLast = index === STEPS.length - 1
@@ -199,11 +216,13 @@ function TourOverlay({
         window.setTimeout(() => measure(el), reduce ? 30 : 380)
       } else measure(el)
     }
-    const measure = (el: HTMLElement) => {
+    const measure = (el: HTMLElement, again = true) => {
       if (cancelled) return
       const r = el.getBoundingClientRect()
       setRect({ x: r.left - PAD, y: r.top - PAD, w: r.width + PAD * 2, h: r.height + PAD * 2 })
       setReady(true)
+      // Targets may still be settling (list entrance animations): measure once more.
+      if (again) window.setTimeout(() => measure(el, false), 450)
     }
     locate()
     return () => {
@@ -271,17 +290,36 @@ function TourOverlay({
   const cardW = Math.min(340, viewport.w - 32)
   const safeTop = 16
   const safeBottom = 16
-  let cardStyle: React.CSSProperties
+  // Always positioned by `top` (switching between top/bottom confuses the animation layer).
+  let cardTop: number
+  let cardLeft = (viewport.w - cardW) / 2
   if (rect) {
-    const spaceBelow = viewport.h - (rect.y + rect.h)
-    const placeBelow = spaceBelow > 230
-    const left = Math.min(Math.max(16, rect.x + rect.w / 2 - cardW / 2), viewport.w - cardW - 16)
-    cardStyle = placeBelow
-      ? { left, top: Math.min(rect.y + rect.h + 14, viewport.h - safeBottom - 200), width: cardW }
-      : { left, bottom: Math.max(safeBottom, viewport.h - rect.y + 14), width: cardW }
+    const gap = 14
+    const below = rect.y + rect.h + gap
+    const above = rect.y - gap - cardH
+    cardLeft = Math.min(Math.max(16, rect.x + rect.w / 2 - cardW / 2), viewport.w - cardW - 16)
+    if (below + cardH <= viewport.h - safeBottom) cardTop = below
+    else if (above >= safeTop) cardTop = above
+    // Big target on a short screen: pin to the edge that hides less of it.
+    else cardTop = viewport.h - (rect.y + rect.h) >= rect.y ? viewport.h - safeBottom - cardH : safeTop
   } else {
-    cardStyle = { left: (viewport.w - cardW) / 2, top: Math.max(safeTop, viewport.h / 2 - 120), width: cardW }
+    cardTop = Math.max(safeTop, (viewport.h - cardH) / 2)
   }
+  const cardStyle: React.CSSProperties = { left: cardLeft, top: cardTop, width: cardW }
+
+  // If neither side has room but target + card would fit on screen together, nudge the page
+  // so the card sits above the target instead of covering it (small iPhones).
+  const fitsTogether = rect ? rect.h + cardH + 14 + safeTop + 24 <= viewport.h : false
+  const covered = rect ? cardTop < rect.y + rect.h && cardTop + cardH > rect.y : false
+  useEffect(() => {
+    if (!ready || !rect || !covered || !fitsTogether) return
+    const maxDown = document.documentElement.scrollHeight - window.innerHeight - window.scrollY
+    // Card below the target (scroll down) or above it (scroll up), whichever the page allows.
+    const toBelow = rect.y - (viewport.h - safeBottom - cardH - 14 - rect.h)
+    const toAbove = rect.y - (safeTop + cardH + 14)
+    const delta = toBelow > 0 && toBelow <= maxDown ? toBelow : toAbove < 0 && window.scrollY + toAbove >= 0 ? toAbove : 0
+    if (Math.abs(delta) > 2) window.scrollBy({ top: delta, behavior: reduce ? 'auto' : 'smooth' })
+  }, [ready, index, covered, fitsTogether, rect, cardH, reduce, viewport.h])
 
   const ease = [0.22, 1, 0.36, 1] as const
   const hole = rect ?? { x: viewport.w / 2, y: viewport.h / 2, w: 0, h: 0 }
@@ -302,7 +340,7 @@ function TourOverlay({
             <motion.rect
               fill="black"
               initial={false}
-              animate={{ x: hole.x, y: hole.y, width: hole.w, height: hole.h, rx: rect ? 18 : 0 }}
+              animate={{ attrX: hole.x, attrY: hole.y, width: hole.w, height: hole.h, rx: rect ? 18 : 0 }}
               transition={{ duration: reduce ? 0 : 0.42, ease }}
             />
           </mask>
@@ -314,13 +352,13 @@ function TourOverlay({
         {ready && (
           <motion.div
             key={step.id}
-            ref={cardRef}
+            ref={setCardEl}
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
             aria-describedby={bodyId}
             className="bg-surface shadow-float absolute rounded-[24px] p-5"
-            style={{ ...cardStyle, marginBottom: 'var(--safe-bottom)' }}
+            style={cardStyle}
             initial={{ opacity: 0, y: reduce ? 0 : 8 * dir, scale: reduce ? 1 : 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, transition: { duration: reduce ? 0 : 0.12 } }}

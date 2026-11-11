@@ -1,4 +1,5 @@
 import { ChevronDown, ChevronLeft, Pencil, Plus } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useAuth } from '@/auth/AuthProvider'
@@ -174,7 +175,13 @@ export function RoomDetailPage() {
             body={filter === 'mine' ? 'Claim something from this room to see it here.' : undefined}
           />
         ) : (
-          <div className="mt-1">
+          <motion.div
+            key={`${filter}-${sort}`}
+            className="mt-1"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.18 }}
+          >
             {groups.map((g) => (
               <section key={g.key} className="mt-4" aria-label={g.label || 'Items'}>
                 {g.label && (
@@ -183,9 +190,11 @@ export function RoomDetailPage() {
                   </h2>
                 )}
                 <ul>
-                  {g.items.map((item) => (
-                    <ItemRow key={item.id} item={item} onOpen={setOpen} />
-                  ))}
+                  <AnimatePresence initial={false}>
+                    {g.items.map((item) => (
+                      <ItemRow key={item.id} item={item} onOpen={setOpen} />
+                    ))}
+                  </AnimatePresence>
                 </ul>
               </section>
             ))}
@@ -210,7 +219,7 @@ export function RoomDetailPage() {
               </span>
               Add an item
             </button>
-          </div>
+          </motion.div>
         )}
       </div>
 

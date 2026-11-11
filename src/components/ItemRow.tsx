@@ -87,7 +87,7 @@ export function ItemRow({ item, onOpen, roomName }: ItemRowProps) {
         }}
         className="pressable active:bg-surface-2 -mx-2 flex min-h-[64px] cursor-pointer items-center gap-3 rounded-2xl px-2 py-2 outline-none"
         aria-label={`${item.name}. ${statusText}. ${who}. Open details`}
-        data-tour="item-row"
+        data-tour={isUnclaimed(item) ? 'item-row-claim' : 'item-row'}
       >
         <CompleteToggle checked={item.is_complete} label={`${item.name} is in the flat`} onToggle={toggle} />
         <div className="min-w-0 flex-1">

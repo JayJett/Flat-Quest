@@ -1,6 +1,5 @@
 export const AVATAR_INPUT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
 export const AVATAR_MAX_INPUT_BYTES = 15 * 1024 * 1024
-export const AVATAR_SIZE = 512
 
 export function validateAvatarFile(file: File): string | null {
   if (!file.type.startsWith('image/')) return 'Choose a photo (JPEG, PNG or WebP).'
@@ -26,25 +25,25 @@ function loadImage(file: File): Promise<HTMLImageElement> {
 }
 
 /**
- * Centre-crops to a square, scales to 512px and re-encodes (WebP, or JPEG where
- * WebP encoding isn't supported). Strips EXIF/location data as a side effect.
+ * Downscales a photo (keeping its shape) to at most `maxEdge` px and re-encodes it
+ * as WebP (JPEG fallback). Used for wishlist inspiration photos; strips EXIF.
  */
-export async function prepareAvatar(file: File): Promise<{ blob: Blob; ext: 'webp' | 'jpg'; type: string }> {
+export async function prepareImage(file: File, maxEdge = 1280): Promise<{ blob: Blob; ext: 'webp' | 'jpg' }> {
   const img = await loadImage(file)
-  const side = Math.min(img.naturalWidth, img.naturalHeight)
-  if (side < 64) throw new Error('That image is too small. Use one at least 64 × 64 pixels.')
-  const size = Math.min(AVATAR_SIZE, side)
+  const scale = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight))
+  const w = Math.max(1, Math.round(img.naturalWidth * scale))
+  const h = Math.max(1, Math.round(img.naturalHeight * scale))
   const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
+  canvas.width = w
+  canvas.height = h
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Your browser couldn’t process the image.')
   ctx.imageSmoothingQuality = 'high'
-  ctx.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size)
-  const toBlob = (type: string) => new Promise<Blob | null>((r) => canvas.toBlob(r, type, 0.86))
+  ctx.drawImage(img, 0, 0, w, h)
+  const toBlob = (type: string) => new Promise<Blob | null>((r) => canvas.toBlob(r, type, 0.84))
   const webp = await toBlob('image/webp')
-  if (webp && webp.type === 'image/webp') return { blob: webp, ext: 'webp', type: 'image/webp' }
+  if (webp && webp.type === 'image/webp') return { blob: webp, ext: 'webp' }
   const jpg = await toBlob('image/jpeg')
   if (!jpg) throw new Error('Your browser couldn’t process the image.')
-  return { blob: jpg, ext: 'jpg', type: 'image/jpeg' }
+  return { blob: jpg, ext: 'jpg' }
 }

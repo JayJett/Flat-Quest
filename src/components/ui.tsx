@@ -1,6 +1,6 @@
 import { LoaderCircle } from 'lucide-react'
-import { motion } from 'motion/react'
-import { forwardRef, useId, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { motion, useReducedMotion, useSpring, useTransform } from 'motion/react'
+import { forwardRef, useEffect, useId, type ButtonHTMLAttributes, type ReactNode } from 'react'
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'ink'
 
@@ -192,12 +192,17 @@ export function EmptyState({
   action?: ReactNode
 }) {
   return (
-    <div className="flex flex-col items-center px-6 py-12 text-center">
+    <motion.div
+      className="flex flex-col items-center px-6 py-12 text-center"
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+    >
       {icon && <div className="text-ink-3 mb-4">{icon}</div>}
       <h3 className="text-[18px] font-bold">{title}</h3>
       {body && <p className="text-ink-2 mt-1.5 max-w-xs text-[15px]">{body}</p>}
       {action && <div className="mt-5">{action}</div>}
-    </div>
+    </motion.div>
   )
 }
 
@@ -221,4 +226,16 @@ export function ErrorPanel({ message, onRetry }: { message: string; onRetry?: ()
       )}
     </div>
   )
+}
+
+/** Number that counts to its new value (feedback when progress changes). Static with reduced motion. */
+export function AnimatedNumber({ value, className }: { value: number; className?: string }) {
+  const reduce = useReducedMotion()
+  const mv = useSpring(value, { stiffness: 140, damping: 22, mass: 0.6 })
+  const text = useTransform(mv, (v) => Math.round(v).toString())
+  useEffect(() => {
+    if (reduce) mv.jump(value)
+    else mv.set(value)
+  }, [value, reduce, mv])
+  return <motion.span className={className}>{text}</motion.span>
 }

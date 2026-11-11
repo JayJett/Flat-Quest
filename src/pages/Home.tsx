@@ -1,4 +1,5 @@
 import { ArrowRight, ChevronRight, Plus } from 'lucide-react'
+import { AnimatePresence } from 'motion/react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { useAuth } from '@/auth/AuthProvider'
@@ -6,7 +7,7 @@ import { PageHeader } from '@/components/AppShell'
 import { ItemRow } from '@/components/ItemRow'
 import { HouseholdPhoto } from '@/components/HouseholdPhoto'
 import { ItemSheet } from '@/components/ItemSheet'
-import { EmptyState, IconButton, ProgressBar, SectionHeader } from '@/components/ui'
+import { AnimatedNumber, EmptyState, IconButton, ProgressBar, SectionHeader } from '@/components/ui'
 import { RoomIcon } from '@/design/icons'
 import { roomColor } from '@/design/tokens'
 import { PRIORITY_RANK, type Item } from '@/lib/domain'
@@ -81,7 +82,7 @@ export function HomePage() {
                 </h2>
                 <div className="flex items-end justify-between gap-4">
                   <p className="text-[56px] leading-none font-extrabold tracking-[-0.04em] tabular-nums">
-                    {pct}
+                    <AnimatedNumber value={pct} />
                     <span className="text-[28px] tracking-normal">%</span>
                   </p>
                   <p className="text-ink-2 pb-1 text-right text-[15px] font-medium">
@@ -118,9 +119,11 @@ export function HomePage() {
                     On your list
                   </h2>
                   <ul>
-                    {mine.slice(0, 5).map((item) => (
-                      <ItemRow key={item.id} item={item} onOpen={setOpen} roomName={roomName.get(item.room_id)} />
-                    ))}
+                    <AnimatePresence initial={false}>
+                      {mine.slice(0, 5).map((item) => (
+                        <ItemRow key={item.id} item={item} onOpen={setOpen} roomName={roomName.get(item.room_id)} />
+                      ))}
+                    </AnimatePresence>
                   </ul>
                 </section>
               )}
@@ -184,7 +187,9 @@ function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div>
       <dt className="text-ink-2 text-[14px] font-medium">{label}</dt>
-      <dd className="text-[22px] font-bold tabular-nums">{value}</dd>
+      <dd className="text-[22px] font-bold tabular-nums">
+        <AnimatedNumber value={value} />
+      </dd>
     </div>
   )
 }
