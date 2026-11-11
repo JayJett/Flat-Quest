@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { useAuth } from '@/auth/AuthProvider'
 import { PageHeader } from '@/components/AppShell'
 import { ItemRow } from '@/components/ItemRow'
+import { HouseholdPhoto } from '@/components/HouseholdPhoto'
 import { ItemSheet } from '@/components/ItemSheet'
 import { EmptyState, IconButton, ProgressBar, SectionHeader } from '@/components/ui'
 import { RoomIcon } from '@/design/icons'
@@ -47,13 +48,17 @@ export function HomePage() {
         }
       />
       <div className="px-4 lg:px-0">
-        <section className="pt-2 pb-7">
-          <p className="text-ink-2 text-[17px] font-medium">Kia ora{firstName ? `, ${firstName}` : ''}</p>
-          <h1 className="mt-1 text-[36px] leading-[1.06] tracking-[-0.035em] text-balance lg:text-[48px]">
-            <span className="font-light">Let’s furnish</span>
-            <br />
-            <span className="font-extrabold">{household?.name ?? 'our flat'}</span>
-          </h1>
+        <section className="flex items-end gap-4 pt-2 pb-7">
+          <div className="min-w-0 flex-1">
+            <p className="text-ink-2 text-[17px] font-medium">Kia ora{firstName ? `, ${firstName}` : ''}</p>
+            {/* Fluid size keeps the flat name on one line beside the photo on small iPhones. */}
+            <h1 className="mt-1 text-[clamp(28px,8.4vw,38px)] leading-[1.06] tracking-[-0.035em] lg:text-[48px]">
+              <span className="font-light">Let’s furnish</span>
+              <br />
+              <span className="font-extrabold [overflow-wrap:anywhere]">{household?.name ?? 'our flat'}</span>
+            </h1>
+          </div>
+          <HouseholdPhoto size="clamp(68px, 21vw, 96px)" />
         </section>
 
         {progress.total === 0 ? (
@@ -70,7 +75,7 @@ export function HomePage() {
           <div className="lg:grid lg:grid-cols-[1.1fr_1fr] lg:gap-10">
             <div>
               {/* Overall progress: real counts, no decoration. */}
-              <section aria-labelledby="progress-h" className="bg-surface-2 rounded-[var(--radius-tile)] p-5">
+              <section aria-labelledby="progress-h" data-tour="progress" className="bg-surface-2 rounded-[var(--radius-tile)] p-5">
                 <h2 id="progress-h" className="sr-only">
                   Household progress
                 </h2>

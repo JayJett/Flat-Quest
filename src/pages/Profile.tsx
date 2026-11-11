@@ -8,7 +8,8 @@ import { Button, Field } from '@/components/ui'
 import { PROFILE_ICONS, ProfileIcon } from '@/design/icons'
 import { MEMBER_COLORS } from '@/design/tokens'
 import { contrast, normaliseHex, readableOn, tooLightOnWhite } from '@/lib/color'
-import { prepareAvatar, validateAvatarFile } from '@/lib/image'
+import { validateAvatarFile } from '@/lib/image'
+import { ImageCropper, type CropResult } from '@/components/ImageCropper'
 import { errorMessage, supabase } from '@/lib/supabase'
 import { useHousehold } from '@/household/HouseholdProvider'
 
@@ -28,6 +29,7 @@ export function ProfilePage() {
   const [nameError, setNameError] = useState<string | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [cropFile, setCropFile] = useState<File | null>(null)
 
   // Keep the form in sync if the profile changes elsewhere (another device).
   const [syncedFrom, setSyncedFrom] = useState(me?.updated_at)
@@ -53,19 +55,23 @@ export function ProfilePage() {
     )
   }, [query])
 
-  const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file || !user) return
     const invalid = validateAvatarFile(file)
     if (invalid) return toast.error(invalid)
+    setCropFile(file)
+  }
+
+  const uploadCropped = async ({ blob, ext }: CropResult) => {
+    if (!user) return
     setUploading(true)
     try {
-      const { blob, ext, type } = await prepareAvatar(file)
-      const localUrl = URL.createObjectURL(blob)
-      setPreview(localUrl)
       const path = `${user.id}/avatar-${Date.now()}.${ext}`
-      const { error: upErr } = await supabase.storage.from('avatars').upload(path, blob, { contentType: type, upsert: false })
+      const { error: upErr } = await supabase.storage
+        .from('avatars')
+        .upload(path, blob, { contentType: ext === 'webp' ? 'image/webp' : 'image/jpeg', upsert: false })
       if (upErr) throw upErr
       const old = me?.avatar_path
       const res = await updateProfile({ avatar_path: path })
@@ -74,9 +80,10 @@ export function ProfilePage() {
         throw new Error(res.error)
       }
       if (old && old !== path) void supabase.storage.from('avatars').remove([old])
+      setPreview(URL.createObjectURL(blob))
+      setCropFile(null)
       toast.success('Photo updated')
     } catch (err) {
-      setPreview(null)
       toast.error(errorMessage(err, 'Couldn’t upload that photo.'))
     } finally {
       setUploading(false)
@@ -139,6 +146,15 @@ export function ProfilePage() {
             </button>
           </div>
           <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={onPick} tabIndex={-1} />
+          <ImageCropper
+            file={cropFile}
+            title="Position your photo"
+            shape="circle"
+            size={512}
+            busy={uploading}
+            onCancel={() => setCropFile(null)}
+            onConfirm={(r) => void uploadCropped(r)}
+          />
           <p className="mt-4 flex items-center gap-2 text-[24px] font-extrabold tracking-[-0.02em]">
             {name.trim() || 'Your name'}
             <ProfileIcon name={icon} size={22} strokeWidth={2.2} style={{ color: iconOnWhite }} aria-hidden />

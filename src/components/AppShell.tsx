@@ -1,4 +1,5 @@
 import {
+  Compass,
   Gift,
   House,
   LayoutGrid,
@@ -18,6 +19,7 @@ import { ProfileIcon } from '@/design/icons'
 import { useHousehold } from '@/household/HouseholdProvider'
 import { Avatar } from './Avatar'
 import { useFocusTrap } from './Sheet'
+import { TourProvider, useTour } from './Tour'
 
 const PRIMARY_NAV: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
   { to: '/', label: 'Home', icon: House, end: true },
@@ -46,6 +48,7 @@ export function AppShell() {
   }, [location.pathname])
 
   return (
+    <TourProvider>
     <DrawerContext.Provider value={{ open: () => setDrawerOpen(true) }}>
       <div className="lg:flex" style={{ paddingLeft: 'var(--safe-left)', paddingRight: 'var(--safe-right)' }}>
         <SideRail />
@@ -59,6 +62,7 @@ export function AppShell() {
       <BottomNav />
       <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </DrawerContext.Provider>
+    </TourProvider>
   )
 }
 
@@ -87,7 +91,7 @@ export function PageHeader({
 
   return (
     <header
-      className={`bg-surface/95 sticky top-0 z-30 backdrop-blur-none transition-[border-color] duration-200 ${scrolled ? 'border-line border-b' : 'border-b border-transparent'}`}
+      className={`bg-surface sticky top-0 z-30 transition-[border-color] duration-200 ${scrolled ? 'border-line border-b' : 'border-b border-transparent'}`}
       style={{ paddingTop: 'var(--safe-top)' }}
     >
       <div className="flex h-16 items-center gap-2 px-4 lg:px-0">
@@ -96,6 +100,7 @@ export function PageHeader({
             type="button"
             onClick={drawer.open}
             aria-label="Open menu"
+            data-tour="profile"
             className="pressable -ml-1 rounded-full p-1 lg:hidden"
           >
             <Avatar profile={me} size={40} decorative />
@@ -136,6 +141,7 @@ function BottomNav() {
             <NavLink
               to={to}
               end={end}
+              data-tour={`nav-${label.toLowerCase()}`}
               className={({ isActive }) =>
                 `pressable flex flex-1 flex-col items-center justify-center gap-1 text-[12px] font-semibold ${isActive ? 'text-ink' : 'text-ink-2'}`
               }
@@ -165,7 +171,7 @@ function SideRail() {
   const { me, household } = useHousehold()
   return (
     <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col px-5 py-8 lg:flex">
-      <NavLink to="/profile" className="pressable flex items-center gap-3 rounded-2xl p-2">
+      <NavLink to="/profile" data-tour="profile" className="pressable flex items-center gap-3 rounded-2xl p-2">
         <Avatar profile={me} size={44} decorative />
         <div className="min-w-0">
           <p className="truncate font-bold">{me?.display_name || 'You'}</p>
@@ -179,6 +185,7 @@ function SideRail() {
               key={to}
               to={to}
               end={end}
+              data-tour={`nav-${label.toLowerCase()}`}
               className={({ isActive }) =>
                 `pressable flex min-h-12 items-center gap-3 rounded-2xl px-3 font-semibold ${isActive ? 'bg-surface-2 text-ink' : 'text-ink-2 hover:text-ink'}`
               }
@@ -202,6 +209,7 @@ const DRAWER_LINKS: { to: string; label: string; icon: LucideIcon; end?: boolean
 function Drawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { me, household } = useHousehold()
   const { signOut } = useAuth()
+  const tour = useTour()
   const navigate = useNavigate()
   const ref = useRef<HTMLDivElement>(null)
   useFocusTrap(open, ref, onClose)
@@ -278,6 +286,17 @@ function Drawer({ open, onClose }: { open: boolean; onClose: () => void }) {
               </ul>
             </nav>
             <div className="px-3">
+              <button
+                type="button"
+                onClick={() => {
+                  onClose()
+                  window.setTimeout(() => tour.start(), 260)
+                }}
+                className="pressable active:bg-surface-2 flex min-h-13 w-full items-center gap-4 rounded-2xl px-3 text-[17px] font-semibold"
+              >
+                <Compass size={22} aria-hidden />
+                Show me around
+              </button>
               <button
                 type="button"
                 onClick={async () => {
