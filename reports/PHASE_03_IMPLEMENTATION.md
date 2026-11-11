@@ -1,7 +1,7 @@
 # Flat Quest — Phase 3 Implementation
 
 Report date: 11 November 2026 (Pacific/Auckland).
-Branch: `phase-3-polish`. Base: `0bfa577c648963892e8dea9e57274cf251aa7a2a`.
+Implemented on `phase-3-polish`, merged through [PR #1](https://github.com/JayJett/Flat-Quest/pull/1). Base: `0bfa577c648963892e8dea9e57274cf251aa7a2a`.
 
 ## Scope and design
 
@@ -43,14 +43,22 @@ No application schema migration, household import, user modification or Storage 
 - Baseline: 45 unit tests passed; original build had one 870.07 kB JS chunk (258.86 kB gzip).
 - Current local lint, TypeScript/production build and 57 unit tests pass.
 - Desktop browser regression checks pass; small iPhone WebKit checks pass (10, with offline-worker integration reserved for Chromium).
-- Local browser verification (32 full-suite checks plus three added tour checks; nine affected checks re-run after review): **35 scenarios passed, 1 explicitly skipped** (WebKit offline-worker integration; Chromium covers it). The isolated database job passed all 80 assertions in [Actions run 42969034109](https://github.com/JayJett/Flat-Quest/actions/runs/42969034109). Final-head CI and deployment are recorded below once complete.
-- Split build entry plus shared preload: 750.37 kB raw / 229.73 kB gzip, about **11.3% less initial compressed JS** than the baseline. Individual route chunks load on demand; this is a build-size measurement, not a real-device speed claim.
+- Final PR and production CI: **35 browser tests passed, 1 explicitly skipped** (WebKit offline-worker integration; Chromium covers it). **57 unit tests passed**, lint and production build passed, and the disposable local database passed **all 80 access assertions**. Final PR verification: [run 42969310270](https://github.com/JayJett/Flat-Quest/actions/runs/42969310270). Production verification: [run 42969809257](https://github.com/JayJett/Flat-Quest/actions/runs/42969809257).
+- Split build entry plus shared preload: 750.37 kB raw / 229.73 kB gzip, about **11.3% less compressed shell JS** than the baseline. Including Home and its static dependencies, the first Home view is approximately **242.7 kB gzip**, about **6.2% below** the original 258.86 kB single bundle. Other routes load on demand. These are build-size measurements, not real-device speed claims.
 - Production build uses `/Flat-Quest/`, matching GitHub Pages; tests cover direct route loads with this sub-path.
 - No physical iPhone, Add to Home Screen installation, actual pinch gestures or two real household devices were used. Browser tests use invented “Our Flat”/“Alex” records and never intentional writes to live household data.
 
 ## Deployment
 
-Pending final verification and merge through the existing `.github/workflows/deploy.yml`. No deployment success is claimed in this pre-merge report; the report will be updated with the verified Actions run and commit.
+**Successfully deployed on 11 November 2026, at approximately 7:07 pm NZDT.**
+
+- Feature head: `769640a9d142eb14bc75ec4d414adb4df616d225`.
+- Merge/release commit: `be26e02f771d844aa371d03c228b18f32394ed13`.
+- Existing Pages workflow: [production run 42969809257](https://github.com/JayJett/Flat-Quest/actions/runs/42969809257). Check/build, local database tests and Publish all concluded **success**.
+- Live app: https://jayjett.github.io/Flat-Quest/.
+- Post-deploy HTTP checks returned 200 for the homepage, service worker and offline fallback. The homepage references the exact production bundle names; `sw.js` and `offline.html` match the locally tested content. Entry, household-provider and Home JavaScript were additionally compared with the tested build.
+- The last live-data check after merge still matched all four original row fingerprints, and the test-only schema remained absent. The security advisor no longer reports its three mutable-search-path helper warnings.
+- This final deployment-record update changes documentation only and uses `[skip ci]`; it does not replace the verified deployed application or require another application build.
 
 ## Deliberate limits / follow-up
 
