@@ -11,7 +11,7 @@ import {
 } from 'react'
 import { useAuth } from '@/auth/AuthProvider'
 import { useToast } from '@/components/Toast'
-import type { HouseholdMemberRow, ItemRow, ProfileRow, RoomRow } from '@/lib/database.types'
+import type { HouseholdMemberRow, HouseholdRow, ItemAssigneeRow, ItemRow, ProfileRow, RoomRow } from '@/lib/database.types'
 import { toItem, type Household, type Item, type Member, type Profile, type Room } from '@/lib/domain'
 import { errorMessage, supabase } from '@/lib/supabase'
 
@@ -25,8 +25,6 @@ export type ItemPatch = Partial<
     | 'description'
     | 'priority'
     | 'status'
-    | 'responsibility'
-    | 'responsible_user_id'
     | 'ownership'
     | 'owner_user_id'
     | 'is_complete'
@@ -40,7 +38,7 @@ export type ItemPatch = Partial<
 >
 export type ItemInput = ItemPatch & Pick<Item, 'name' | 'room_id'>
 export type RoomPatch = Partial<Pick<Room, 'name' | 'icon' | 'color' | 'sort_order'>>
-export type ProfilePatch = Partial<Pick<Profile, 'display_name' | 'avatar_path' | 'accent_color' | 'icon'>>
+export type ProfilePatch = Partial<Pick<Profile, 'display_name' | 'avatar_path' | 'accent_color' | 'icon' | 'tour_completed_at'>>
 
 type Result<T = void> = { ok: true; data: T } | { ok: false; error: string }
 
@@ -59,6 +57,8 @@ interface HouseholdState {
   createItem: (input: ItemInput) => Promise<Result<Item>>
   updateItem: (id: string, patch: ItemPatch) => Promise<Result<Item>>
   deleteItem: (id: string) => Promise<Result>
+  /** Replace who is responsible for an item (0 = unclaimed, 2+ = shared). Optimistic. */
+  setAssignees: (itemId: string, userIds: string[]) => Promise<Result>
   // Rooms
   createRoom: (input: { name: string; icon: string; color: string }) => Promise<Result<Room>>
   updateRoom: (id: string, patch: RoomPatch) => Promise<Result>
@@ -67,6 +67,8 @@ interface HouseholdState {
   // Profile & household
   updateProfile: (patch: ProfilePatch) => Promise<Result>
   updateHousehold: (patch: { name?: string; address?: string | null }) => Promise<Result>
+  /** Upload (or remove, with null) the shared household photo. */
+  setHouseholdPhoto: (photo: Blob | null, ext?: 'webp' | 'jpg') => Promise<Result>
   createHousehold: (name: string, address: string) => Promise<Result<string>>
   acceptInvite: (code: string) => Promise<Result<string>>
 }
@@ -91,10 +93,14 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   const [memberRows, setMemberRows] = useState<HouseholdMemberRow[]>([])
   const [profiles, setProfiles] = useState<Map<string, Profile>>(new Map())
   const [rooms, setRooms] = useState<Room[]>([])
-  const [items, setItems] = useState<Item[]>([])
+  const [rawItems, setItems] = useState<Item[]>([])
+  /** itemId → assigned user ids (source of truth: item_assignees). */
+  const [assignments, setAssignments] = useState<Map<string, string[]>>(new Map())
 
   /** Items with in-flight writes: realtime echoes for these are ignored until the write settles. */
   const pending = useRef(new Map<string, number>())
+  /** Items whose assignees are mid-write. */
+  const pendingAssign = useRef(new Map<string, number>())
   const householdIdRef = useRef<string | null>(null)
   const lastLoad = useRef(0)
 
@@ -105,13 +111,14 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   }
 
   const loadHouseholdData = useCallback(async (householdId: string) => {
-    const [hh, mem, rms, its] = await Promise.all([
+    const [hh, mem, rms, its, asg] = await Promise.all([
       supabase.from('households').select('*').eq('id', householdId).single(),
       supabase.from('household_members').select('*').eq('household_id', householdId),
       supabase.from('rooms').select('*').eq('household_id', householdId).order('sort_order'),
       supabase.from('items').select('*').eq('household_id', householdId).order('sort_order'),
+      supabase.from('item_assignees').select('*').eq('household_id', householdId).order('created_at'),
     ])
-    const err = hh.error ?? mem.error ?? rms.error ?? its.error
+    const err = hh.error ?? mem.error ?? rms.error ?? its.error ?? asg.error
     if (err) throw err
     const ids = (mem.data ?? []).map((m) => m.user_id)
     const prof = ids.length ? await supabase.from('profiles').select('*').in('id', ids) : { data: [], error: null }
@@ -121,6 +128,17 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     setMemberRows(mem.data ?? [])
     setProfiles(new Map((prof.data ?? []).map((p) => [p.id, p])))
     setRooms([...(rms.data ?? [])].sort(byOrder))
+    setAssignments((prev) => {
+      const next = new Map<string, string[]>()
+      for (const a of asg.data ?? []) next.set(a.item_id, [...(next.get(a.item_id) ?? []), a.user_id])
+      // Keep optimistic assignee lists for items mid-write.
+      for (const id of pendingAssign.current.keys()) {
+        const local = prev.get(id)
+        if (local) next.set(id, local)
+        else next.delete(id)
+      }
+      return next
+    })
     // Keep optimistic values for items that are mid-write.
     setItems((prev) => {
       const prevById = new Map(prev.map((i) => [i.id, i]))
@@ -216,6 +234,26 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       setProfiles((prev) => (prev.has(row.id) ? new Map(prev).set(row.id, row) : prev))
       if (row.id === userId) setMe(row)
     }
+    const onAssignee = (payload: RealtimePostgresChangesPayload<ItemAssigneeRow>) => {
+      const row = (payload.eventType === 'DELETE' ? payload.old : payload.new) as Partial<ItemAssigneeRow>
+      const itemId = row.item_id
+      const uid = row.user_id
+      if (!itemId || !uid || pendingAssign.current.has(itemId)) return
+      if (payload.eventType === 'INSERT' && row.household_id !== householdId) return
+      setAssignments((prev) => {
+        const current = prev.get(itemId) ?? []
+        const has = current.includes(uid)
+        if (payload.eventType === 'DELETE' ? !has : has) return prev
+        const next = new Map(prev)
+        next.set(itemId, payload.eventType === 'DELETE' ? current.filter((u) => u !== uid) : [...current, uid])
+        return next
+      })
+    }
+    const onHousehold = (payload: RealtimePostgresChangesPayload<HouseholdRow>) => {
+      if (payload.eventType !== 'UPDATE') return
+      const row = payload.new as HouseholdRow
+      if (row.id === householdId) setHousehold(row)
+    }
     const onMember = () => {
       // Membership changes are rare; refetch so profiles come along too.
       void loadHouseholdData(householdId).catch(() => undefined)
@@ -225,6 +263,14 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'items', filter: `household_id=eq.${householdId}` }, onItem)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `household_id=eq.${householdId}` }, onRoom)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, onProfile)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'item_assignees', filter: `household_id=eq.${householdId}` },
+        onAssignee,
+      )
+      // DELETE events can't be filtered server-side; they only carry the primary key.
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'item_assignees' }, onAssignee)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'households', filter: `id=eq.${householdId}` }, onHousehold)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'household_members', filter: `household_id=eq.${householdId}` },
@@ -269,7 +315,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     async (input) => {
       const hid = householdIdRef.current
       if (!hid) return { ok: false, error: 'No household' }
-      const maxOrder = items.filter((i) => i.room_id === input.room_id).reduce((m, i) => Math.max(m, i.sort_order), -1)
+      const maxOrder = rawItems.filter((i) => i.room_id === input.room_id).reduce((m, i) => Math.max(m, i.sort_order), -1)
       const { data, error } = await supabase
         .from('items')
         .insert({ ...input, household_id: hid, sort_order: maxOrder + 1 })
@@ -280,13 +326,37 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       setItems((prev) => (prev.some((i) => i.id === item.id) ? prev : [...prev, item]))
       return { ok: true, data: item }
     },
-    [items],
+    [rawItems],
   )
 
-  const itemsRef = useRef(items)
+  const itemsRef = useRef(rawItems)
   useEffect(() => {
-    itemsRef.current = items
-  }, [items])
+    itemsRef.current = rawItems
+  }, [rawItems])
+  const assignmentsRef = useRef(assignments)
+  useEffect(() => {
+    assignmentsRef.current = assignments
+  }, [assignments])
+
+  const setAssignees = useCallback<HouseholdState['setAssignees']>(async (itemId, userIds) => {
+    const before = assignmentsRef.current.get(itemId) ?? []
+    const unique = [...new Set(userIds)]
+    const n = (pendingAssign.current.get(itemId) ?? 0) + 1
+    pendingAssign.current.set(itemId, n)
+    setAssignments((prev) => new Map(prev).set(itemId, unique))
+    const { error } = await supabase.rpc('set_item_assignees', { p_item: itemId, p_users: unique })
+    const left = (pendingAssign.current.get(itemId) ?? 1) - 1
+    if (left <= 0) pendingAssign.current.delete(itemId)
+    else pendingAssign.current.set(itemId, left)
+    if (error) {
+      setAssignments((prev) => new Map(prev).set(itemId, before))
+      return { ok: false, error: errorMessage(error, 'Couldn’t update who’s on it.') }
+    }
+    if (unique.length > 0) {
+      setItems((prev) => prev.map((i) => (i.id === itemId && i.needs_assignees ? { ...i, needs_assignees: false } : i)))
+    }
+    return { ok: true, data: undefined }
+  }, [])
 
   const updateItem = useCallback<HouseholdState['updateItem']>(async (id, patch) => {
     const before = itemsRef.current.find((i) => i.id === id)
@@ -402,6 +472,27 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     return { ok: true, data: undefined }
   }, [])
 
+  const setHouseholdPhoto = useCallback<HouseholdState['setHouseholdPhoto']>(async (photo, ext = 'webp') => {
+    const hid = householdIdRef.current
+    if (!hid) return { ok: false, error: 'No household' }
+    let newPath: string | null = null
+    if (photo) {
+      newPath = `${hid}/photo-${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('household-media')
+        .upload(newPath, photo, { contentType: ext === 'webp' ? 'image/webp' : 'image/jpeg', upsert: false })
+      if (upErr) return { ok: false, error: errorMessage(upErr, 'Couldn’t upload that photo.') }
+    }
+    const { data: oldPath, error } = await supabase.rpc('set_household_photo', { p_household: hid, p_path: newPath })
+    if (error) {
+      if (newPath) await supabase.storage.from('household-media').remove([newPath])
+      return { ok: false, error: errorMessage(error, 'Couldn’t save the photo.') }
+    }
+    if (oldPath && oldPath !== newPath) void supabase.storage.from('household-media').remove([oldPath])
+    setHousehold((h) => (h ? { ...h, photo_path: newPath } : h))
+    return { ok: true, data: undefined }
+  }, [])
+
   const createHousehold = useCallback<HouseholdState['createHousehold']>(
     async (name, address) => {
       const { data, error } = await supabase.rpc('create_household', { p_name: name, p_address: address })
@@ -450,6 +541,16 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
 
   const memberById = useMemo(() => new Map(members.map((m) => [m.userId, m])), [members])
 
+  // Items carry their assignees (only current members, in join order of assignment).
+  const items = useMemo<Item[]>(
+    () =>
+      rawItems.map((i) => {
+        const a = assignments.get(i.id) ?? []
+        return a === i.assignees ? i : { ...i, assignees: a }
+      }),
+    [rawItems, assignments],
+  )
+
   const reload = useCallback(async () => {
     await load()
   }, [load])
@@ -476,12 +577,14 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       createItem,
       updateItem,
       deleteItem,
+      setAssignees,
       createRoom,
       updateRoom,
       deleteRoom,
       reorderRooms,
       updateProfile,
       updateHousehold,
+      setHouseholdPhoto,
       createHousehold,
       acceptInvite,
     }),
@@ -499,12 +602,14 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       createItem,
       updateItem,
       deleteItem,
+      setAssignees,
       createRoom,
       updateRoom,
       deleteRoom,
       reorderRooms,
       updateProfile,
       updateHousehold,
+      setHouseholdPhoto,
       createHousehold,
       acceptInvite,
     ],

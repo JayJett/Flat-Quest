@@ -3,11 +3,8 @@ import type { HouseholdRow, ItemRow, ProfileRow, RoomRow } from './database.type
 export const PRIORITIES = ['must_have', 'nice_to_have', 'maybe_later'] as const
 export type Priority = (typeof PRIORITIES)[number]
 
-export const STATUSES = ['to_decide', 'bringing', 'need_to_buy', 'shopping', 'ordered', 'not_needed'] as const
+export const STATUSES = ['to_decide', 'bringing', 'need_to_buy', 'shopping', 'ordered', 'provided', 'not_needed'] as const
 export type Status = (typeof STATUSES)[number]
-
-export const RESPONSIBILITIES = ['unclaimed', 'member', 'shared'] as const
-export type Responsibility = (typeof RESPONSIBILITIES)[number]
 
 export const OWNERSHIPS = ['to_decide', 'member', 'shared', 'landlord'] as const
 export type Ownership = (typeof OWNERSHIPS)[number]
@@ -24,6 +21,7 @@ export const STATUS_LABEL: Record<Status, string> = {
   need_to_buy: 'Need to buy',
   shopping: 'Shopping',
   ordered: 'Ordered',
+  provided: 'Provided with flat',
   not_needed: 'Not needed',
 }
 
@@ -37,11 +35,12 @@ export const OWNERSHIP_LABEL: Record<Ownership, string> = {
 export type Profile = ProfileRow
 export type Household = HouseholdRow
 export type Room = RoomRow
-export interface Item extends Omit<ItemRow, 'priority' | 'status' | 'responsibility' | 'ownership'> {
+export interface Item extends Omit<ItemRow, 'priority' | 'status' | 'ownership'> {
   priority: Priority
   status: Status
-  responsibility: Responsibility
   ownership: Ownership
+  /** User ids responsible for this item (from item_assignees). 0 = unclaimed, 2+ = shared. */
+  assignees: string[]
 }
 
 export interface Member {
@@ -59,16 +58,20 @@ export function isStatus(v: unknown): v is Status {
 }
 
 /** Normalises a raw DB row into the strongly typed Item, tolerating unknown values. */
-export function toItem(row: ItemRow): Item {
+export function toItem(row: ItemRow, assignees: string[] = []): Item {
+  // Phase 1 columns may still be present in responses until they're dropped.
+  const { responsibility: _r, responsible_user_id: _u, ...rest } = row as ItemRow & {
+    responsibility?: unknown
+    responsible_user_id?: unknown
+  }
   return {
-    ...row,
+    ...rest,
+    assignees,
+    needs_assignees: Boolean(row.needs_assignees),
     estimated_price: row.estimated_price == null ? null : Number(row.estimated_price),
     actual_price: row.actual_price == null ? null : Number(row.actual_price),
     priority: isPriority(row.priority) ? row.priority : 'must_have',
     status: isStatus(row.status) ? row.status : 'to_decide',
-    responsibility: (RESPONSIBILITIES as readonly string[]).includes(row.responsibility)
-      ? (row.responsibility as Responsibility)
-      : 'unclaimed',
     ownership: (OWNERSHIPS as readonly string[]).includes(row.ownership)
       ? (row.ownership as Ownership)
       : 'to_decide',
@@ -82,5 +85,12 @@ export const STATUS_RANK: Record<Status, number> = {
   shopping: 2,
   bringing: 3,
   ordered: 4,
-  not_needed: 5,
+  provided: 5,
+  not_needed: 6,
+}
+
+/** "Jarden", "Jarden and Madi", "Jarden, Madi and Emily". */
+export function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? ''
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
 }

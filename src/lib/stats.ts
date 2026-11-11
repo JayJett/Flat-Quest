@@ -5,7 +5,11 @@ import type { Item, Room } from './domain'
  *  - "Not needed" items are excluded from every count.
  *  - "Ready" means is_complete (physically in the flat). Status never implies completion,
  *    so an "Ordered" item is still outstanding until someone ticks it.
- *  - "Unclaimed" = outstanding and nobody has taken responsibility.
+ *  - "Provided with flat" items (landlord appliances) count like any other item: they're
+ *    ready once someone confirms they're there. They are never "unclaimed" or something
+ *    to buy, because nobody needs to bring them.
+ *  - "Unclaimed" = outstanding, nobody assigned, not provided, and not a Phase 1
+ *    "shared" item that is waiting for people to be picked.
  */
 export interface Progress {
   total: number
@@ -20,6 +24,17 @@ export function countsTowardProgress(item: Pick<Item, 'status'>): boolean {
   return item.status !== 'not_needed'
 }
 
+/** Needs someone to take it on. */
+export function isUnclaimed(item: Pick<Item, 'status' | 'is_complete' | 'assignees' | 'needs_assignees'>): boolean {
+  return (
+    countsTowardProgress(item) &&
+    !item.is_complete &&
+    item.status !== 'provided' &&
+    item.assignees.length === 0 &&
+    !item.needs_assignees
+  )
+}
+
 export function progressOf(items: readonly Item[]): Progress {
   let total = 0
   let ready = 0
@@ -28,7 +43,7 @@ export function progressOf(items: readonly Item[]): Progress {
     if (!countsTowardProgress(item)) continue
     total += 1
     if (item.is_complete) ready += 1
-    else if (item.responsibility === 'unclaimed') unclaimed += 1
+    else if (isUnclaimed(item)) unclaimed += 1
   }
   const outstanding = total - ready
   return { total, ready, outstanding, unclaimed, ratio: total === 0 ? 0 : ready / total }
@@ -43,11 +58,14 @@ export function roomProgress(rooms: readonly Room[], items: readonly Item[]): Ma
   return out
 }
 
-/** Items a member is responsible for that still need doing. */
+/** Items a member is responsible for (alone or shared) that still need doing. */
 export function openItemsFor(userId: string, items: readonly Item[]): Item[] {
-  return items.filter(
-    (i) => i.responsible_user_id === userId && !i.is_complete && countsTowardProgress(i),
-  )
+  return items.filter((i) => i.assignees.includes(userId) && !i.is_complete && countsTowardProgress(i))
+}
+
+/** Completed items a member was responsible for. */
+export function doneItemsFor(userId: string, items: readonly Item[]): Item[] {
+  return items.filter((i) => i.assignees.includes(userId) && i.is_complete && countsTowardProgress(i))
 }
 
 export type NextAction =
@@ -63,9 +81,7 @@ export function nextAction(userId: string, items: readonly Item[]): NextAction {
   if (progress.total === 0) return { kind: 'empty' }
   const mine = openItemsFor(userId, items).length
   if (mine > 0) return { kind: 'mine', count: mine }
-  const unclaimed = items.filter(
-    (i) => countsTowardProgress(i) && !i.is_complete && i.responsibility === 'unclaimed',
-  )
+  const unclaimed = items.filter(isUnclaimed)
   if (unclaimed.length > 0) {
     return {
       kind: 'claim',

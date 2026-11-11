@@ -1,4 +1,5 @@
-import { ExternalLink, Trash2, Users } from 'lucide-react'
+import { Check, ExternalLink, Trash2 } from 'lucide-react'
+import { motion } from 'motion/react'
 import { useId, useState } from 'react'
 import { useAuth } from '@/auth/AuthProvider'
 import {
@@ -10,11 +11,11 @@ import {
   type Item,
   type Ownership,
   type Priority,
-  type Responsibility,
   type Status,
 } from '@/lib/domain'
 import { useHousehold, type ItemPatch } from '@/household/HouseholdProvider'
 import { Avatar } from './Avatar'
+import { assigneeMembers, responsibilityLabel } from './ItemRow'
 import { ConfirmSheet, Sheet } from './Sheet'
 import { useToast } from './Toast'
 import { Button, Field, Segmented } from './ui'
@@ -34,8 +35,7 @@ interface Draft {
   room_id: string
   priority: Priority
   status: Status
-  responsibility: Responsibility
-  responsible_user_id: string | null
+  assignees: string[]
   ownership: Ownership
   owner_user_id: string | null
   is_complete: boolean
@@ -52,8 +52,7 @@ function toDraft(item: Item | null, roomId: string): Draft {
     room_id: item?.room_id ?? roomId,
     priority: item?.priority ?? 'must_have',
     status: item?.status ?? 'to_decide',
-    responsibility: item?.responsibility ?? 'unclaimed',
-    responsible_user_id: item?.responsible_user_id ?? null,
+    assignees: item?.assignees ?? [],
     ownership: item?.ownership ?? 'to_decide',
     owner_user_id: item?.owner_user_id ?? null,
     is_complete: item?.is_complete ?? false,
@@ -95,7 +94,7 @@ export function ItemSheet({ open, onClose, item, roomId }: ItemSheetProps) {
 
 function ItemForm({ item, roomId, onDone }: { item: Item | null; roomId?: string; onDone: () => void }) {
   const { user } = useAuth()
-  const { rooms, members, createItem, updateItem, deleteItem } = useHousehold()
+  const { rooms, members, memberById, createItem, updateItem, deleteItem, setAssignees } = useHousehold()
   const toast = useToast()
   const ids = { name: useId(), desc: useId(), room: useId(), owner: useId(), est: useId(), act: useId(), url: useId(), notes: useId() }
   const [draft, setDraft] = useState<Draft>(() => toDraft(item, roomId ?? rooms[0]?.id ?? ''))
@@ -106,14 +105,17 @@ function ItemForm({ item, roomId, onDone }: { item: Item | null; roomId?: string
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }))
 
-  const setResponsible = (value: string) => {
-    if (value === 'unclaimed' || value === 'shared') {
-      setDraft((d) => ({ ...d, responsibility: value, responsible_user_id: null }))
-    } else {
-      setDraft((d) => ({ ...d, responsibility: 'member', responsible_user_id: value }))
-    }
-  }
-  const responsibleValue = draft.responsibility === 'member' ? (draft.responsible_user_id ?? 'unclaimed') : draft.responsibility
+  const toggleAssignee = (userId: string) =>
+    setDraft((d) => ({
+      ...d,
+      assignees: d.assignees.includes(userId) ? d.assignees.filter((u) => u !== userId) : [...d.assignees, userId],
+    }))
+  const draftPeople = assigneeMembers({ ...(item ?? ({} as Item)), assignees: draft.assignees } as Item, memberById)
+  const whoSummary = responsibilityLabel(
+    { ...(item ?? ({ status: draft.status } as Item)), status: draft.status, assignees: draft.assignees, needs_assignees: Boolean(item?.needs_assignees) && draft.assignees.length === 0 } as Item,
+    draftPeople,
+    user?.id,
+  )
 
   const ownerValue = draft.ownership === 'member' ? `member:${draft.owner_user_id}` : draft.ownership
   const setOwner = (value: string) => {
@@ -143,8 +145,6 @@ function ItemForm({ item, roomId, onDone }: { item: Item | null; roomId?: string
       room_id: draft.room_id,
       priority: draft.priority,
       status: draft.status,
-      responsibility: draft.responsibility,
-      responsible_user_id: draft.responsible_user_id,
       ownership: draft.ownership,
       owner_user_id: draft.owner_user_id,
       is_complete: draft.is_complete,
@@ -155,11 +155,22 @@ function ItemForm({ item, roomId, onDone }: { item: Item | null; roomId?: string
     }
     setSaving(true)
     const res = item ? await updateItem(item.id, payload) : await createItem(payload)
-    setSaving(false)
     if (!res.ok) {
+      setSaving(false)
       toast.error(res.error)
       return
     }
+    const before = item?.assignees ?? []
+    const changed = before.length !== draft.assignees.length || before.some((u) => !draft.assignees.includes(u))
+    if (changed) {
+      const a = await setAssignees(res.data.id, draft.assignees)
+      if (!a.ok) {
+        setSaving(false)
+        toast.error(a.error)
+        return
+      }
+    }
+    setSaving(false)
     toast.success(item ? 'Saved' : `Added “${name}”`)
     onDone()
   }
@@ -203,29 +214,25 @@ function ItemForm({ item, roomId, onDone }: { item: Item | null; roomId?: string
       </label>
 
       <fieldset>
-        <legend className="mb-2 text-[14px] font-semibold">Who’s on it?</legend>
-        <div className="no-scrollbar -mx-5 flex gap-1 overflow-x-auto px-4" role="radiogroup" aria-label="Who’s on it?">
-          <PersonChoice selected={responsibleValue === 'unclaimed'} onClick={() => setResponsible('unclaimed')} label="Unclaimed">
-            <span className="text-ink-2 border-ink-3 flex h-12 w-12 items-center justify-center rounded-full border-2 border-dashed text-[13px] font-bold">
-              ?
-            </span>
-          </PersonChoice>
+        <legend className="mb-1 text-[14px] font-semibold">Who’s on it?</legend>
+        <p className="text-ink-2 mb-2 text-[14px]">Pick one person, or several to share it.</p>
+        <div className="no-scrollbar -mx-5 flex gap-1 overflow-x-auto px-4" role="group" aria-label="Who’s on it?">
           {members.map((m) => (
-            <PersonChoice
+            <PersonToggle
               key={m.userId}
-              selected={responsibleValue === m.userId}
-              onClick={() => setResponsible(m.userId)}
+              selected={draft.assignees.includes(m.userId)}
+              onClick={() => toggleAssignee(m.userId)}
               label={m.userId === user?.id ? 'Me' : m.profile.display_name}
             >
               <Avatar profile={m.profile} size={48} decorative />
-            </PersonChoice>
+            </PersonToggle>
           ))}
-          <PersonChoice selected={responsibleValue === 'shared'} onClick={() => setResponsible('shared')} label="Shared">
-            <span className="bg-surface-2 text-ink flex h-12 w-12 items-center justify-center rounded-full">
-              <Users size={22} aria-hidden />
-            </span>
-          </PersonChoice>
         </div>
+        <p className={`mt-1.5 text-[14px] font-medium ${draft.assignees.length === 0 && item?.needs_assignees ? 'text-orange-ink' : 'text-ink-2'}`} aria-live="polite">
+          {draft.assignees.length === 0 && item?.needs_assignees
+            ? 'This was marked “Shared” before. Choose who’s sharing it.'
+            : whoSummary}
+        </p>
       </fieldset>
 
       <fieldset>
@@ -251,6 +258,9 @@ function ItemForm({ item, roomId, onDone }: { item: Item | null; roomId?: string
         </div>
         {draft.status === 'ordered' && !draft.is_complete && (
           <p className="text-ink-2 mt-2 text-[14px]">Ordered items stay open until someone ticks them as in the flat.</p>
+        )}
+        {draft.status === 'provided' && (
+          <p className="text-ink-2 mt-2 text-[14px]">Supplied by the landlord. Tick “It’s in the flat” once you’ve checked it’s there.</p>
         )}
         {draft.status === 'not_needed' && (
           <p className="text-ink-2 mt-2 text-[14px]">Not needed items don’t count towards progress.</p>
@@ -392,7 +402,7 @@ function ItemForm({ item, roomId, onDone }: { item: Item | null; roomId?: string
   )
 }
 
-function PersonChoice({
+function PersonToggle({
   selected,
   onClick,
   label,
@@ -406,18 +416,39 @@ function PersonChoice({
   return (
     <button
       type="button"
-      role="radio"
+      role="checkbox"
       aria-checked={selected}
+      aria-label={label}
       onClick={onClick}
       className="pressable flex w-[72px] shrink-0 flex-col items-center gap-1.5 rounded-2xl py-1.5"
     >
-      <span
-        className="rounded-full p-[3px] transition-[box-shadow] duration-200"
-        style={{ boxShadow: selected ? '0 0 0 2.5px var(--color-ink)' : '0 0 0 2.5px transparent' }}
-      >
-        {children}
+      <span className="relative rounded-full p-[3px]">
+        <motion.span
+          aria-hidden
+          className="absolute inset-0 rounded-full"
+          initial={false}
+          animate={{ boxShadow: selected ? '0 0 0 2.5px var(--color-ink)' : '0 0 0 2.5px rgba(17,17,17,0)' }}
+          transition={{ duration: 0.16 }}
+        />
+        <motion.span
+          className="block"
+          initial={false}
+          animate={{ opacity: selected ? 1 : 0.55, scale: selected ? 1 : 0.94 }}
+          transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {children}
+        </motion.span>
+        <motion.span
+          aria-hidden
+          className="bg-ink absolute -right-0.5 -bottom-0.5 flex h-5 w-5 items-center justify-center rounded-full text-white ring-2 ring-white"
+          initial={false}
+          animate={{ opacity: selected ? 1 : 0, scale: selected ? 1 : 0.4 }}
+          transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <Check size={12} strokeWidth={3.2} />
+        </motion.span>
       </span>
-      <span className={`w-full truncate text-center text-[13px] ${selected ? 'text-ink font-bold' : 'text-ink-2 font-medium'}`}>
+      <span className={`w-full truncate text-center text-[13px] transition-colors ${selected ? 'text-ink font-bold' : 'text-ink-2 font-medium'}`}>
         {label}
       </span>
     </button>

@@ -12,7 +12,7 @@ import { EmptyState, IconButton, Segmented } from '@/components/ui'
 import { RoomIcon } from '@/design/icons'
 import { roomColor } from '@/design/tokens'
 import { PRIORITY_RANK, type Item } from '@/lib/domain'
-import { countsTowardProgress, progressOf, roomProgress } from '@/lib/stats'
+import { isUnclaimed, progressOf, roomProgress } from '@/lib/stats'
 import { useHousehold } from '@/household/HouseholdProvider'
 
 type View = 'rooms' | 'unclaimed'
@@ -32,7 +32,7 @@ export function RoomsPage() {
   const unclaimed = useMemo(
     () =>
       items
-        .filter((i) => countsTowardProgress(i) && !i.is_complete && i.responsibility === 'unclaimed')
+        .filter(isUnclaimed)
         .sort(
           (a, b) =>
             PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] ||

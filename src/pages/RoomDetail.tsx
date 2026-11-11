@@ -10,7 +10,7 @@ import { EmptyState, IconButton, Segmented } from '@/components/ui'
 import { RoomIcon } from '@/design/icons'
 import { roomColor } from '@/design/tokens'
 import { PRIORITIES, PRIORITY_LABEL, PRIORITY_RANK, STATUS_RANK, type Item } from '@/lib/domain'
-import { progressOf } from '@/lib/stats'
+import { isUnclaimed, progressOf } from '@/lib/stats'
 import { useHousehold } from '@/household/HouseholdProvider'
 
 type Filter = 'all' | 'mine' | 'unclaimed' | 'done'
@@ -34,8 +34,8 @@ export function RoomDetailPage() {
   const counts = useMemo(
     () => ({
       all: roomItems.length,
-      mine: roomItems.filter((i) => i.responsible_user_id === user?.id && !i.is_complete).length,
-      unclaimed: roomItems.filter((i) => i.responsibility === 'unclaimed' && !i.is_complete && i.status !== 'not_needed').length,
+      mine: roomItems.filter((i) => i.assignees.includes(user?.id ?? '') && !i.is_complete).length,
+      unclaimed: roomItems.filter((i) => isUnclaimed(i)).length,
       done: roomItems.filter((i) => i.is_complete).length,
     }),
     [roomItems, user?.id],
@@ -43,8 +43,8 @@ export function RoomDetailPage() {
 
   const visible = useMemo(() => {
     const list = roomItems.filter((i) => {
-      if (filter === 'mine') return i.responsible_user_id === user?.id && !i.is_complete
-      if (filter === 'unclaimed') return i.responsibility === 'unclaimed' && !i.is_complete && i.status !== 'not_needed'
+      if (filter === 'mine') return i.assignees.includes(user?.id ?? '') && !i.is_complete
+      if (filter === 'unclaimed') return isUnclaimed(i)
       if (filter === 'done') return i.is_complete
       return true
     })

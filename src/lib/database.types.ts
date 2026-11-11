@@ -16,6 +16,7 @@ export type ProfileRow = {
   accent_color: string
   icon: string
   preferences: Json
+  tour_completed_at: string | null
   created_at: string
   updated_at: string
 }
@@ -26,6 +27,8 @@ export type HouseholdRow = {
   address: string | null
   created_by: string | null
   settings: Json
+  member_limit: number
+  photo_path: string | null
   created_at: string
   updated_at: string
 }
@@ -46,6 +49,8 @@ export type HouseholdInviteRow = {
   max_uses: number
   use_count: number
   revoked_at: string | null
+  is_legacy: boolean
+  secret_id: string | null
   created_at: string
 }
 
@@ -69,8 +74,7 @@ export type ItemRow = {
   description: string | null
   priority: string
   status: string
-  responsibility: string
-  responsible_user_id: string | null
+  needs_assignees: boolean
   ownership: string
   owner_user_id: string | null
   is_complete: boolean
@@ -87,6 +91,51 @@ export type ItemRow = {
   updated_at: string
 }
 
+export type ItemAssigneeRow = {
+  item_id: string
+  household_id: string
+  user_id: string
+  created_at: string
+}
+
+export type WishlistItemRow = {
+  id: string
+  household_id: string
+  room_id: string | null
+  title: string
+  notes: string | null
+  estimated_price: number | null
+  shopping_url: string | null
+  photo_path: string | null
+  is_chosen: boolean
+  chosen_at: string | null
+  chosen_by: string | null
+  checklist_item_id: string | null
+  import_key: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type WishlistVoteRow = {
+  idea_id: string
+  household_id: string
+  user_id: string
+  created_at: string
+}
+
+export type InviteSummary = {
+  id: string
+  code: string | null
+  is_legacy: boolean
+  created_at: string
+  created_by: string | null
+  expires_at: string
+  use_count: number
+  people_can_join: number
+  spaces_left: number
+}
+
 export type Database = {
   __InternalSupabase: { PostgrestVersion: '14.18' }
   public: {
@@ -97,6 +146,9 @@ export type Database = {
       household_invites: Table<HouseholdInviteRow, 'household_id' | 'token_hash' | 'expires_at'>
       rooms: Table<RoomRow, 'household_id' | 'name'>
       items: Table<ItemRow, 'household_id' | 'room_id' | 'name'>
+      item_assignees: Table<ItemAssigneeRow, 'item_id' | 'household_id' | 'user_id'>
+      wishlist_items: Table<WishlistItemRow, 'household_id' | 'title'>
+      wishlist_votes: Table<WishlistVoteRow, 'idea_id' | 'household_id'>
     }
     Views: { [_ in never]: never }
     Functions: {
@@ -112,7 +164,15 @@ export type Database = {
       }
       preview_household_invite: {
         Args: { p_code: string }
-        Returns: { household_name: string; member_count: number; is_member: boolean }[]
+        Returns: { household_name: string; member_count: number; is_member: boolean; spaces_left: number }[]
+      }
+      get_household_invites: { Args: { p_household: string }; Returns: InviteSummary[] }
+      set_item_assignees: { Args: { p_item: string; p_users: string[] }; Returns: undefined }
+      set_household_photo: { Args: { p_household: string; p_path: string | null }; Returns: string | null }
+      add_wishlist_to_checklist: { Args: { p_idea: string; p_room?: string }; Returns: string }
+      import_wishlist: {
+        Args: { p_household: string; p_rows: Json }
+        Returns: { ideas_created: number; ideas_skipped: number }[]
       }
       revoke_household_invite: { Args: { p_invite: string }; Returns: undefined }
     }

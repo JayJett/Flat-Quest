@@ -92,6 +92,9 @@ const STATUS_MAP: Record<string, Status> = {
   'need to buy': 'need_to_buy',
   shopping: 'shopping',
   ordered: 'ordered',
+  provided: 'provided',
+  'provided with flat': 'provided',
+  'provided by landlord': 'provided',
   'not needed': 'not_needed',
 }
 

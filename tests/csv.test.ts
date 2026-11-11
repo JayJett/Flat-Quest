@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { checklistFromCsv, cleanRoomName, parseCsv } from '@/lib/csv'
+import { withLandlordAppliances } from '@/household/importChecklist'
 
 describe('parseCsv', () => {
   it('handles quotes, escaped quotes, commas and CRLF', () => {
@@ -107,5 +108,28 @@ describe('checklistFromCsv with the raw sheet export layout', () => {
     expect(warnings.some((w) => w.includes('unknown priority'))).toBe(true)
     expect(warnings.some((w) => w.includes('needs a room and a name'))).toBe(true)
     expect(rows).toHaveLength(2)
+  })
+})
+
+describe('landlord appliances for new households', () => {
+  const rows = withLandlordAppliances(checklistFromCsv(readFileSync('data/checklist.csv', 'utf8')).rows)
+  const provided = rows.filter((r) => r.status === 'provided')
+
+  it('marks the sheet appliances provided and adds the dishwasher and dryer', () => {
+    expect(provided.map((r) => r.name).sort()).toEqual(
+      ['Dishwasher', 'Dryer', 'Fridge / freezer (confirm supplied)', 'Microwave', 'Washing machine (confirm supplied)'].sort(),
+    )
+    expect(provided.every((r) => r.owned_by === 'Landlord')).toBe(true)
+    expect(rows).toHaveLength(105)
+  })
+
+  it('does not catch look-alike items', () => {
+    expect(rows.find((r) => r.name === 'Dishwashing liquid')?.status).toBe('to_decide')
+    expect(rows.find((r) => r.name === 'Clothes drying rack')?.status).toBe('to_decide')
+  })
+
+  it('understands "Provided with flat" in imported CSVs', () => {
+    const { rows: r } = checklistFromCsv('Room,Item,Plan / status\nKitchen,Fridge,Provided with flat')
+    expect(r[0]?.status).toBe('provided')
   })
 })

@@ -15,6 +15,7 @@ interface InvitePreview {
   household_name: string
   member_count: number
   is_member: boolean
+  spaces_left: number
 }
 
 /** Extracts an invite code from a pasted link or bare code. */
@@ -232,9 +233,15 @@ export function JoinPage() {
               {error}
             </p>
           )}
-          <Button size="lg" block className="mt-10" loading={busy} onClick={shown.is_member ? () => navigate('/') : accept}>
-            {shown.is_member ? 'You’re already in — open it' : 'Join the flat'}
-          </Button>
+          {!shown.is_member && shown.spaces_left <= 0 ? (
+            <p className="bg-surface-2 mt-8 rounded-[var(--radius-card)] p-5 font-medium">
+              This flat is already full. Ask a flatmate if they meant to invite you.
+            </p>
+          ) : (
+            <Button size="lg" block className="mt-10" loading={busy} onClick={shown.is_member ? () => navigate('/') : accept}>
+              {shown.is_member ? 'You’re already in. Open it' : 'Join the flat'}
+            </Button>
+          )}
         </>
       )}
     </AuthLayout>
