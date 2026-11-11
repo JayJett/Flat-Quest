@@ -16,8 +16,9 @@ It's hosted the same way as Moni Money, on GitHub Pages, so there are no new acc
 | 2 | Tell Supabase the app's web address | **Yes** |
 | 3 | Make sign-up instant (skip email confirmation) | Recommended |
 | 4 | Create your flat and invite everyone | **Yes** |
-| 5 | Mark the landlord's appliances | Recommended |
+| 5 | Landlord's appliances | Already done for you |
 | 6 | Add "Continue with Google" | Optional, can do later |
+| 7 | Security settings | Recommended |
 
 Words you'll see:
 - **GitHub** is where the app's code is stored (`JayJett/Flat-Quest`), and also what hosts the website.
@@ -91,7 +92,7 @@ Strangers still can't see anything. Without an invite link from someone in your 
 1. Open **https://jayjett.github.io/Flat-Quest/** on your phone.
 2. Tap **Create an account**, enter your name, email and a password (8+ characters), and tap **Create account**.
    - If you skipped Part 3, check your email and tap the confirmation link first.
-3. Tap **Set up our flat**. The name **9 Rua Kai Wai** is already filled in.
+3. Tap **Set up our flat** and type the flat’s name.
 4. Leave **Start with our checklist** switched **on** (this loads all 103 items from your Google Sheet), then tap **Create flat**.
 5. Tap **Flatmates** at the bottom, then **Invite a flatmate**, then **Create invite link**.
 6. Tap **Share** (or **Copy link**) and send it to Madi, Emily and Dan in your group chat.
@@ -108,17 +109,9 @@ Strangers still can't see anything. Without an invite link from someone in your 
 
 ---
 
-## Part 5: Mark the landlord's appliances
+## Part 5: Landlord's appliances (already done)
 
-Your Google Sheet lists the fridge, microwave and washing machine, which the landlord provides. They were imported exactly as the sheet had them, so that nothing was silently changed. For each one:
-
-1. Go to **Rooms** and open **Kitchen** (fridge, microwave) or **Laundry & cleaning** (washing machine).
-2. Tap the item.
-3. Under **Plan**, tap **Not needed**.
-4. Under **Owned by**, choose **Landlord**.
-5. Tap **Save changes**.
-
-They'll then stop counting towards your progress.
+The fridge/freezer, microwave and washing machine are marked **Provided with flat** (owned by the landlord), and a dishwasher and dryer were added. Tick each one once you’ve checked it’s actually there; they never show up as things to buy.
 
 ---
 
@@ -158,6 +151,18 @@ Email sign-in works without this. The Google button stays hidden until this is s
 5. Click **Save**.
 
 Reload https://jayjett.github.io/Flat-Quest/: the **Continue with Google** button now appears on the sign-in screen.
+
+---
+
+## Part 7 (recommended): Security settings
+
+**Block leaked passwords.** This stops people choosing passwords known from data breaches.
+1. In Supabase (project **flat-quest**), open **Authentication**.
+2. Look for **Attack Protection** (or it may be under **Sign In / Providers → Email**).
+3. Turn on **Prevent use of leaked passwords**, then click **Save**.
+   - If it says this needs a paid plan, skip it. The app already requires passwords of 8+ characters.
+
+**Your address in GitHub.** The current files no longer contain the flat’s street address, but early versions in the GitHub history still do, because the repository is public. GitHub Pages hosting is free only for public repositories, so making it private would take the app offline unless you pay for GitHub Pro. Ask Claude if you’d like the history cleaned up instead.
 
 ---
 

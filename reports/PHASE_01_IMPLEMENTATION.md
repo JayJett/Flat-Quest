@@ -40,7 +40,7 @@ Phase 1 of Flat Quest is built: a mobile-first React web app on a new, dedicated
 - **`/auth/callback`** completes OAuth and email-link sign-ins, then returns the user to where they were going (`?next=`, restricted to internal paths). Provider errors and timeouts get a clear failure screen.
 - **`/auth/reset`** sets a new password after a reset link.
 - **Welcome** (users with no household):
-  - *Set up our flat* is prefilled with "9 Rua Kai Wai" / "Brooklyn, Wellington", with a "Start with our checklist (103 items across 10 rooms)" toggle.
+  - *Set up our flat* is prefilled with the flat’s name and suburb, with a "Start with our checklist (103 items across 10 rooms)" toggle.
   - *I have an invite link* accepts a pasted link or code.
 - **Join** (`/join?code=…`) previews the household name and member count before joining. Signed-out visitors are sent to sign-in and brought back afterwards.
 
@@ -56,7 +56,7 @@ Phase 1 of Flat Quest is built: a mobile-first React web app on a new, dedicated
 
 ### Home (`src/pages/Home.tsx`)
 Every number on this screen is calculated from items in the database (`src/lib/stats.ts`).
-- Greeting ("Kia ora, Jarden") above a two-weight headline: *Let's furnish* (light) / **9 Rua Kai Wai** (extra-bold). This echoes the reference's "let's learn / **something new**".
+- Greeting ("Kia ora, Jarden") above a two-weight headline: *Let's furnish* (light) / **[flat name]** (extra-bold). This echoes the reference's "let's learn / **something new**".
 - **Progress block:**
   - Large percentage and "x of y in the flat".
   - An animated progress bar.
@@ -239,7 +239,7 @@ Things you need to set (section K): Site URL / Redirect URLs, Google provider cr
 **How the reference shaped the interface:**
 - **Bright white base** with `#F5F5F6` surfaces instead of bordered cards (Top Mentors / Class Mentors rows → Flatmates rows, progress block, form fields).
 - **Large saturated rounded tiles with line illustrations** (Design Art / Chemistry / Science / Mathe → room tiles and room headers). I used oversized, cropped Lucide line icons as the "illustration", so they stay consistent and editable rather than being bespoke art.
-- **Two-weight display headlines** ("let's learn / **something new**" → "Let's furnish / **9 Rua Kai Wai**", "Dream it up, / **together**").
+- **Two-weight display headlines** ("let's learn / **something new**" → "Let's furnish / **[flat name]**", "Dream it up, / **together**").
 - **Minimal white bottom nav** with line icons.
 - Round avatars as the primary identity marker.
 
@@ -296,7 +296,7 @@ A unit test (`tests/csv.test.ts`) asserts these exact counts per room and per pr
 - Rows are keyed `room:<room>|<item>` (with `#2` for genuine duplicates in a room), so re-running never duplicates anything and never overwrites edits. *Settings → Restore original checklist* uses this to bring back deleted originals.
 - *Settings → Import from a CSV file* accepts the sheet's own export (Google Sheets → File → Download → CSV while on the CHECKLIST tab; title rows are skipped) or any CSV with the same headers. It previews counts and warnings, then imports.
 
-**Live import confirmed (11 Nov 2026):** Jarden signed up by email on the live site at https://jayjett.github.io/Flat-Quest/ and created "9 Rua Kai Wai" with the checklist. The database then held 1 household, 1 member (owner), 10 rooms in sheet order and 103 items: Living room 11, Kitchen 26, Dining 4, Shared bathroom 10, Master ensuite 8, Laundry & cleaning 14, Master bedroom 9, Other bedrooms 5, Entry & safety 12, Outdoor & carport 4. Priorities were 74/21/8; all 103 items were *To decide*, unclaimed and not complete; there were no duplicates. This is also the first confirmed end-to-end run of live email sign-up, household creation and import.
+**Live import confirmed (11 Nov 2026):** Jarden signed up by email on the live site at https://jayjett.github.io/Flat-Quest/ and created "[flat name]" with the checklist. The database then held 1 household, 1 member (owner), 10 rooms in sheet order and 103 items: Living room 11, Kitchen 26, Dining 4, Shared bathroom 10, Master ensuite 8, Laundry & cleaning 14, Master bedroom 9, Other bedrooms 5, Entry & safety 12, Outdoor & carport 4. Priorities were 74/21/8; all 103 items were *To decide*, unclaimed and not complete; there were no duplicates. This is also the first confirmed end-to-end run of live email sign-up, household creation and import.
 
 **Landlord-supplied appliances:** the sheet includes "Fridge / freezer (confirm supplied)", "Microwave" and "Washing machine (confirm supplied)". You said the landlord provides these (plus a dishwasher and dryer, which aren't on the sheet). I imported the sheet **exactly** rather than editing it. After importing, open each of those three items and set Plan → *Not needed* and Owned by → *Landlord*; they will then drop out of progress counts.
 

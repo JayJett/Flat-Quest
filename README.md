@@ -1,11 +1,11 @@
 # Flat Quest
 
-A private, collaborative home-furnishing app for **9 Rua Kai Wai** (Brooklyn, Wellington). Flatmates see everything the house needs, claim what they're bringing or buying, and tick items off once they're physically in the flat.
+A private, collaborative home-furnishing app for our flat. Flatmates see everything the house needs, claim what they're bringing or buying, and tick items off once they're physically in the flat.
 
 Mobile-first React web app backed by Supabase (Auth, Postgres with row level security, Storage, Realtime).
 
 > **New to this? Start with [`SETUP_GUIDE.md`](SETUP_GUIDE.md)**, which gives click-by-click setup instructions.
-> Phase 1 status and verification details: [`reports/PHASE_01_IMPLEMENTATION.md`](reports/PHASE_01_IMPLEMENTATION.md)
+> Status and verification details: [Phase 1](reports/PHASE_01_IMPLEMENTATION.md) · [Phase 2](reports/PHASE_02_IMPLEMENTATION.md)
 
 ## Stack
 
@@ -59,9 +59,18 @@ The dev server runs on **http://localhost:3000**, which matches Supabase's defau
 
 The hosted project used in Phase 1 is `flat-quest` (`ivnovvdpkxrqsmsiqhid`, Sydney region). Migrations in `supabase/migrations/` have already been applied to it. To set up a fresh project, apply them in order (Supabase CLI `supabase db push`, or paste each file into the SQL editor):
 
-1. `20261110000001_core_schema.sql`: tables, triggers, RLS policies, RPCs, realtime publication
-2. `20261110000002_avatar_storage.sql`: private `avatars` bucket and storage policies
-3. `20261110000003_harden_helpers_and_indexes.sql`: advisor follow-ups
+| Migration | Purpose |
+| --- | --- |
+| `20261110000001_core_schema.sql` | Tables, triggers, RLS, RPCs, realtime |
+| `20261110000002_avatar_storage.sql` | Private `avatars` bucket and policies |
+| `20261110000003_harden_helpers_and_indexes.sql` | Advisor follow-ups |
+| `20261111000001_private_helpers.sql` | Membership helpers moved to a non-exposed `private` schema |
+| `20261111000002_single_invite.sql` / `…0003_invite_full_house.sql` | One current invite per household (Vault-encrypted code), member limit |
+| `20261111000004_item_assignees.sql` / `…0008_drop_phase1_responsibility.sql` | Responsibility shared between selected members |
+| `20261111000005_provided_status.sql` | "Provided with flat" status, landlord appliances |
+| `20261111000006_tour_and_household_photo.sql` | Tour state, household photo, `household-media` bucket |
+| `20261111000007_wishlist.sql` | Wishlist ideas, votes, conversion to checklist |
+| `20261111000009_phase2_indexes.sql` | Performance-advisor indexes |
 
 `supabase/tests/rls_verification.sql` is a self-cleaning script that impersonates three users and checks access isolation; run it in the SQL editor and every row should read `PASS`.
 
@@ -103,15 +112,19 @@ Vercel also works (`vercel.json` is kept): import the repo and deploy with no se
 
 ## How it works
 
-- **Households and invites:** a signed-in user creates a household (becoming its owner) or joins one with an invite link. Invite codes are 144-bit random tokens; only their SHA-256 hash is stored, they expire after 7 days and allow up to 4 uses. Membership can only be created through the `accept_household_invite` RPC.
+- **Households and invites:** a signed-in user creates a household (becoming its owner) or joins one with an invite link. Each household has one current link at a time (enforced by a row lock and a unique index), valid for 7 days while the flat has free places (default limit 4). The 144-bit code is kept encrypted in Supabase Vault so members can share it again; the readable table only holds its SHA-256 hash. Membership can only be created through the `accept_household_invite` RPC.
+- **Who's on it:** `item_assignees` links items to any number of members (0 = unclaimed, 2+ = shared). Composite foreign keys keep assignees inside the item's household and remove them automatically if a member leaves.
+- **Wishlist:** ideas with room/price/link/photo, one vote per member (`wishlist_votes` primary key), and `add_wishlist_to_checklist` to turn a chosen idea into exactly one checklist item.
+- **Household photo / wishlist photos:** private `household-media` bucket, one folder per household, readable and writable only by members.
+- **Tour:** stored per person in `profiles.tour_completed_at`; replay from the menu ("Show me around").
 - **Access control:** every table has RLS. Policies call `is_household_member()`, which checks the `household_members` table for `auth.uid()`. Profiles are visible to people you share a household with and editable only by their owner (column-level grants restrict editable fields). Avatars live in a private bucket under `<user-id>/…` and are served via short-lived signed URLs.
-- **Items:** responsibility (who's bringing or buying it) and ownership (who keeps it) are separate fields. Completion (`is_complete`) is independent of status, so an *Ordered* item stays open until someone ticks it. *Not needed* items are excluded from all progress counts. `completed_at`/`completed_by` are set by a database trigger, not the client.
-- **Realtime:** one channel per household listens to `items`, `rooms`, `household_members` and `profiles` changes. After a disconnect the app refetches everything, and it also refreshes when the tab becomes visible again or the device comes back online.
+- **Items:** responsibility (who's bringing or buying it) and ownership (who keeps it) are separate. Completion (`is_complete`) is independent of status, so an *Ordered* item stays open until someone ticks it. *Not needed* items are excluded from all progress counts. *Provided with flat* items (landlord appliances) count towards progress once ticked, but are never "unclaimed". `completed_at`/`completed_by` are set by a database trigger, not the client.
+- **Realtime:** one channel per household listens to `items`, `item_assignees`, `rooms`, `households`, `household_members` and `profiles` changes (the Wishlist page adds ideas and votes). After a disconnect the app refetches everything, and it also refreshes when the tab becomes visible again or the device comes back online.
 - **Optimistic updates:** ticking, claiming and editing update the UI immediately and roll back only the touched fields if the write fails, with an error toast. The completion animation plays only after the database confirms the write.
 
 ## Checklist import
 
-`data/checklist.csv` is the exact CHECKLIST tab (103 items, 10 rooms) of the "🏡 Flat Quest — 9 Rua Kai Wai" Google Sheet, exported on 2026-11-10. When creating a household you can start with it; **Settings → Checklist import** can restore it or import another CSV.
+`data/checklist.csv` is the exact CHECKLIST tab (103 items, 10 rooms) of the original Flat Quest Google Sheet, exported on 2026-11-10. When creating a household you can start with it; **Settings → Checklist import** can restore it or import another CSV.
 
 Imports go through the `import_checklist` RPC and are idempotent: each row is keyed by room + item name, so re-importing never duplicates anything and never overwrites edits. The importer accepts the sheet's own CSV export (title rows above the header are skipped) or the normalised `data/checklist.csv`. "Who's on it?" and "Owned by" values are matched to flatmates' display names; unmatched names stay unclaimed.
 

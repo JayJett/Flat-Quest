@@ -26,7 +26,7 @@ describe('cleanRoomName', () => {
   })
 })
 
-describe('bundled 9 Rua Kai Wai checklist', () => {
+describe('bundled original checklist', () => {
   const { rows, warnings } = checklistFromCsv(readFileSync('data/checklist.csv', 'utf8'))
 
   it('contains exactly the 103 items from the Google Sheet', () => {

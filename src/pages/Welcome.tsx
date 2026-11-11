@@ -41,8 +41,8 @@ export function WelcomePage() {
   const roomCount = useMemo(() => new Set(rows.map((r) => r.room)).size, [rows])
 
   const [step, setStep] = useState<'choose' | 'create' | 'join'>('choose')
-  const [name, setName] = useState('9 Rua Kai Wai')
-  const [address, setAddress] = useState('Brooklyn, Wellington')
+  const [name, setName] = useState('')
+  const [address, setAddress] = useState('')
   const [withChecklist, setWithChecklist] = useState(true)
   const [invite, setInvite] = useState('')
   const [busy, setBusy] = useState(false)
@@ -123,10 +123,10 @@ export function WelcomePage() {
         <form onSubmit={create} className="flex flex-col gap-5" noValidate>
           <h1 className="text-display font-bold">Set up your flat</h1>
           <Field label="Flat name" htmlFor={ids.name}>
-            <input id={ids.name} className="field font-semibold" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
+            <input id={ids.name} className="field font-semibold" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="e.g. 12 Example Street" />
           </Field>
           <Field label="Suburb or address" htmlFor={ids.address} hint="Only visible to your flatmates">
-            <input id={ids.address} className="field" value={address} onChange={(e) => setAddress(e.target.value)} maxLength={120} />
+            <input id={ids.address} className="field" value={address} onChange={(e) => setAddress(e.target.value)} maxLength={120} placeholder="Optional" />
           </Field>
           <label className="bg-surface-2 flex cursor-pointer items-center justify-between gap-4 rounded-[var(--radius-control)] p-4">
             <span>

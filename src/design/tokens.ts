@@ -56,7 +56,7 @@ export interface RoomPreset {
   color: string
 }
 
-/** Icon + colour presets for the rooms in the 9 Rua Kai Wai checklist. */
+/** Icon + colour presets for the rooms in the original Flat Quest checklist. */
 const ROOM_PRESETS: { match: RegExp; preset: RoomPreset }[] = [
   { match: /living|lounge/i, preset: { icon: 'sofa', color: 'orange' } },
   { match: /kitchen/i, preset: { icon: 'cooking-pot', color: 'periwinkle' } },

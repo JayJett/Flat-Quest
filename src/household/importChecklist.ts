@@ -4,14 +4,14 @@ import type { Json } from '@/lib/database.types'
 import { errorMessage, supabase } from '@/lib/supabase'
 
 /**
- * The 103-item CHECKLIST tab of "🏡 Flat Quest — 9 Rua Kai Wai", exported
+ * The 103-item CHECKLIST tab of the original Flat Quest Google Sheet, exported
  * 2026-11-10 to data/checklist.csv. Parsed with the same importer as uploads.
  */
 export function bundledChecklist(): ImportRow[] {
   return withLandlordAppliances(checklistFromCsv(checklistCsv).rows)
 }
 
-/** Appliances the landlord supplies at 9 Rua Kai Wai (told to us after the sheet was made). */
+/** Appliances the landlord supplies (told to us after the sheet was made). */
 export const LANDLORD_APPLIANCES: { room: string; name: string; match: RegExp }[] = [
   { room: 'Kitchen', name: 'Fridge / freezer (confirm supplied)', match: /^fridge/i },
   { room: 'Kitchen', name: 'Microwave', match: /^microwave$/i },
