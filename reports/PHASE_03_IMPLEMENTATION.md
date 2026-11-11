@@ -42,7 +42,7 @@ No application schema migration, household import, user modification or Storage 
 
 - Baseline: 45 unit tests passed; original build had one 870.07 kB JS chunk (258.86 kB gzip).
 - Current local lint, TypeScript/production build and 57 unit tests pass.
-- Desktop browser regression checks pass; small iPhone WebKit checks pass (10, with offline-worker integration reserved for Chromium).
+- Desktop browser regression checks pass; small iPhone WebKit checks pass (11, including all six tour steps; offline-worker integration is reserved for Chromium).
 - Final PR and production CI: **35 browser tests passed, 1 explicitly skipped** (WebKit offline-worker integration; Chromium covers it). **57 unit tests passed**, lint and production build passed, and the disposable local database passed **all 80 access assertions**. Final PR verification: [run 42969310270](https://github.com/JayJett/Flat-Quest/actions/runs/42969310270). Production verification: [run 42969809257](https://github.com/JayJett/Flat-Quest/actions/runs/42969809257).
 - Split build entry plus shared preload: 750.37 kB raw / 229.73 kB gzip, about **11.3% less compressed shell JS** than the baseline. Including Home and its static dependencies, the first Home view is approximately **242.7 kB gzip**, about **6.2% below** the original 258.86 kB single bundle. Other routes load on demand. These are build-size measurements, not real-device speed claims.
 - Production build uses `/Flat-Quest/`, matching GitHub Pages; tests cover direct route loads with this sub-path.
