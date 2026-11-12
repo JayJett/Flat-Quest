@@ -1,7 +1,11 @@
 -- Run only after the schema and Edge function have been verified. No existing
 -- objects are enrolled. Do not print the secret or copy it into app configuration.
 create extension if not exists pg_cron;
-create extension if not exists pg_net;
+create extension if not exists pg_net with schema extensions;
+-- Only the scheduler's database owner uses net; browser roles need no access.
+revoke usage on schema net from public, anon, authenticated;
+revoke all on all functions in schema net from public, anon, authenticated;
+revoke all on all tables in schema net from public, anon, authenticated;
 do $$
 declare token text;
 begin
