@@ -1,4 +1,5 @@
 import type { Page, Route } from '@playwright/test'
+import type { Visual, Transformation } from '../../src/visual/types'
 
 export const uid = '11111111-1111-4111-8111-111111111111'
 export const hid = '22222222-2222-4222-8222-222222222222'
@@ -42,6 +43,7 @@ export async function mockFlat(page: Page, tour = false, opts: { flatmates?: boo
     // Phase 4
     options: [] as OptionRow[], preferences: [] as PreferenceRow[], coordinators: [] as CoordinatorRow[], purchases: [] as PurchaseRow[],
     files: [] as string[], removedFiles: [] as string[],
+    visuals: [] as Visual[], transformations: [] as Transformation[], reservations: [] as string[], failVisualSave: false,
     failOptionSave: false, failPreference: false, failPurchase: false, failUpload: false, shoppingDown: false,
     optionWrites: 0, purchaseSaves: 0, claimAttempts: 0,
   }
@@ -80,13 +82,36 @@ export async function mockFlat(page: Page, tour = false, opts: { flatmates?: boo
       }
       if (method === 'POST') {
         if (state.failUpload) return send({ statusCode: '500', error: 'Internal', message: 'Upload unavailable' }, 500)
-        if (!path.startsWith(`${hid}/products/`)) return send({ statusCode: '403', error: 'Unauthorized', message: 'new row violates row-level security policy' }, 403)
+        if (!path.startsWith(`${hid}/products/`) && !path.startsWith(`${hid}/visual/`)) return send({ statusCode: '403', error: 'Unauthorized', message: 'new row violates row-level security policy' }, 403)
         state.files.push(path)
         return send({ Key: `household-media/${path}`, Id: 'mock' })
       }
     }
 
     const body = request.postDataJSON()
+    if (table === 'reserve_media_upload') {
+      const path = `${hid}/${body.p_kind}/88888888-8888-4888-8888-${String(++tick).padStart(12, '0')}.${body.p_ext}`
+      state.reservations.push(path)
+      return send({ path, thumbnail_path: body.p_kind === 'visual' ? path.replace(/\.(webp|jpg)$/, '-thumb.$1') : null })
+    }
+    if (table === 'room_visuals' || table === 'room_transformations') {
+      const collection = table === 'room_visuals' ? state.visuals : state.transformations
+      if (method === 'GET') return rows(q('id') ? collection.filter(x => x.id === q('id')) : collection)
+      if (state.failVisualSave) return dbError('500', 'Gallery save unavailable', 500)
+      if (method === 'POST') {
+        const row = { id: `99999999-9999-4999-8999-${String(++tick).padStart(12, '0')}`, title: null, notes: null, source_url: null, taken_on: null, photo_path: null, thumbnail_path: null, created_by: uid, created_at: stamp(), updated_at: stamp(), ...body }
+        collection.push(row)
+        return rows([row])
+      }
+      const found = collection.find(x => x.id === q('id') && (!q('updated_at') || x.updated_at === q('updated_at')))
+      if (!found) return rows([])
+      if (method === 'PATCH') { Object.assign(found, body, { updated_at: stamp() }); state.visuals.sort((a,b) => a.sort_order-b.sort_order); return rows([found]) }
+      if (method === 'DELETE') {
+        if (table === 'room_visuals') { state.visuals = state.visuals.filter(x => x.id !== found.id); state.transformations = state.transformations.filter(x => x.before_id !== found.id && x.after_id !== found.id) }
+        else state.transformations = state.transformations.filter(x => x.id !== found.id)
+        return rows([found])
+      }
+    }
     if (url.pathname === '/auth/v1/user') return send(user)
     if (url.pathname === '/auth/v1/settings') return send({ external: { google: false } })
     if (table === 'profiles') {
@@ -253,3 +278,4 @@ export async function mockFlat(page: Page, tour = false, opts: { flatmates?: boo
 export async function resync(page: Page) {
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
 }
+

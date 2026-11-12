@@ -304,7 +304,7 @@ test.describe('product options', () => {
     expect(state.options).toHaveLength(1)
     expect(state.files).toHaveLength(1)
     expect(state.options[0]!.photo_path).toBe(state.files[0])
-    expect(state.files[0]).toMatch(new RegExp(`^${hid}/products/${kettle}-\\d+\\.(webp|jpg)$`))
+    expect(state.files[0]).toMatch(new RegExp(`^${hid}/products/[a-f0-9-]+\\.(webp|jpg)$`))
     // The card and the shopping list both lead with the photo.
     await expect(item.getByRole('button', { name: /^Kettle with photo\./ }).locator('img')).toBeVisible()
 
@@ -317,7 +317,7 @@ test.describe('product options', () => {
     await page.waitForTimeout(5)
     await edit.getByRole('button', { name: 'Save changes' }).click()
     await expect(edit).toBeHidden()
-    await expect.poll(() => state.removedFiles).toContain(first)
+    expect(state.removedFiles).toEqual([])
     expect(state.options[0]!.photo_path).not.toBe(first)
 
     // Remove: the option keeps everything else and falls back to the placeholder.
@@ -326,12 +326,12 @@ test.describe('product options', () => {
     await edit.getByRole('button', { name: 'Remove', exact: true }).click()
     await edit.getByRole('button', { name: 'Save changes' }).click()
     await expect(edit).toBeHidden()
-    await expect.poll(() => state.removedFiles).toContain(second)
+    expect(state.files).toContain(second)
     expect(state.options[0]).toMatchObject({ name: 'Kettle with photo', photo_path: null })
-    expect(state.files).toEqual([])
+    expect(state.files).toHaveLength(2)
   })
 
-  test('closing the form after a failed save does not leave an uploaded photo behind', async ({ page }) => {
+  test('closing a failed save leaves a registered upload for backend cleanup', async ({ page }) => {
     const state = await mockFlat(page)
     state.items[0]!.status = 'shopping'
     await page.goto('./rooms/shopping')
@@ -345,7 +345,8 @@ test.describe('product options', () => {
     await expect(page.getByText('Option save unavailable')).toBeVisible()
     expect(state.files).toHaveLength(1)
     await form.getByRole('button', { name: 'Close' }).click()
-    await expect.poll(() => state.files).toEqual([])
+    expect(state.files).toHaveLength(1)
+    expect(state.reservations).toEqual(state.files)
     expect(state.options).toEqual([])
   })
 
@@ -422,7 +423,7 @@ test.describe('product options', () => {
     const details = sheet(page, 'Item details')
     await details.getByRole('button', { name: 'Delete item', exact: true }).click()
     await sheet(page, 'Delete this item?').getByRole('button', { name: 'Delete', exact: true }).click()
-    await expect.poll(() => state.removedFiles).toEqual([`${hid}/products/${kettle}-1.webp`])
+    expect(state.removedFiles).toEqual([])
     await expect(shoppingRow(page, 'Kettle')).toHaveCount(0)
   })
 })
@@ -709,3 +710,4 @@ test('wishlist still works and stays separate from product preferences', async (
   await expect(page.getByRole('button', { name: 'Vote for A reading lamp' })).toBeVisible()
   expect(state.preferences).toEqual([])
 })
+

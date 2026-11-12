@@ -37,16 +37,29 @@ export function useSignedUrl(bucket: MediaBucket, path: string | null | undefine
   useEffect(() => {
     if (!path || !key) return
     let active = true
-    void signedUrl(bucket, path).then((url) => {
+    const refresh = () => { void signedUrl(bucket, path).then((url) => {
       if (active) setResolved({ key, url })
-    })
+    }) }
+    refresh()
+    const timer = window.setInterval(refresh, 50 * 60 * 1000)
+    const visible = () => { if (document.visibilityState === 'visible') refresh() }
+    document.addEventListener('visibilitychange', visible)
+    window.addEventListener('online', refresh)
     return () => {
       active = false
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', visible)
+      window.removeEventListener('online', refresh)
     }
   }, [bucket, path, key])
   if (!key) return null
   return resolved?.key === key ? resolved.url : (cache.get(key)?.url ?? null)
 }
+
+// Signed URLs are bearer links: don't keep another account's cached URLs.
+supabase.auth.onAuthStateChange((event) => {
+  if (event === 'SIGNED_OUT' || event === 'SIGNED_IN') { cache.clear(); inflight.clear() }
+})
 
 export function useAvatarUrl(path: string | null | undefined): string | null {
   return useSignedUrl('avatars', path)
@@ -150,3 +163,4 @@ export function AvatarGroup({
     </span>
   )
 }
+

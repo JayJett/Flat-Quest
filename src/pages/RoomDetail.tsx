@@ -102,6 +102,7 @@ export function RoomDetailPage() {
         }
       />
       <div className="px-4 lg:px-0">
+        <div className="mb-5"><Segmented label="Room view" value="checklist" onChange={() => navigate(`/rooms/${room.id}/visual`)} options={[{ value: 'checklist', label: 'Checklist' }, { value: 'visual', label: 'Visual Home' }]} /></div>
         <section
           className="relative mt-1 overflow-hidden rounded-[var(--radius-tile)] p-5"
           style={{ backgroundColor: c.hex, color: c.on }}
@@ -244,3 +245,4 @@ export function goBack(navigate: ReturnType<typeof useNavigate>, fallback: strin
   if (idx > 0) navigate(-1)
   else navigate(fallback, { replace: true })
 }
+
