@@ -7,6 +7,8 @@ import { supabase } from '@/lib/supabase'
 const cache = new Map<string, { url: string; expires: number }>()
 const inflight = new Map<string, Promise<string | null>>()
 const TTL_SECONDS = 60 * 60
+let cacheGeneration = 0
+export function clearMediaCache() { cacheGeneration++; cache.clear(); inflight.clear() }
 
 export type MediaBucket = 'avatars' | 'household-media'
 
@@ -17,16 +19,17 @@ export function signedUrl(bucket: MediaBucket, path: string): Promise<string | n
   if (hit && hit.expires > Date.now() + 60_000) return Promise.resolve(hit.url)
   const running = inflight.get(key)
   if (running) return running
+  const generation = cacheGeneration
   const p = supabase.storage
     .from(bucket)
     .createSignedUrl(path, TTL_SECONDS)
     .then(({ data }) => {
-      if (!data?.signedUrl) return null
+      if (!data?.signedUrl || generation !== cacheGeneration) return null
       cache.set(key, { url: data.signedUrl, expires: Date.now() + TTL_SECONDS * 1000 })
       return data.signedUrl
     })
     .catch(() => null)
-    .finally(() => inflight.delete(key))
+    .finally(() => { if (generation === cacheGeneration) inflight.delete(key) })
   inflight.set(key, p)
   return p
 }
@@ -57,8 +60,10 @@ export function useSignedUrl(bucket: MediaBucket, path: string | null | undefine
 }
 
 // Signed URLs are bearer links: don't keep another account's cached URLs.
-supabase.auth.onAuthStateChange((event) => {
-  if (event === 'SIGNED_OUT' || event === 'SIGNED_IN') { cache.clear(); inflight.clear() }
+let cachedUser: string | undefined
+supabase.auth.onAuthStateChange((_event, session) => {
+  const user = session?.user.id
+  if (user !== cachedUser) { cachedUser = user; clearMediaCache() }
 })
 
 export function useAvatarUrl(path: string | null | undefined): string | null {

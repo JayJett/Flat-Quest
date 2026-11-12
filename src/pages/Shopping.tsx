@@ -74,7 +74,9 @@ export function ShoppingPage() {
     if (next.priority !== 'all') out.priority = next.priority
     if (next.stage !== 'active') out.stage = next.stage
     if (next.sort !== 'stage') out.sort = next.sort
-    setParams(out, { replace: true })
+    // Commit each native select change before a second select reads the filters.
+    // Safari can otherwise apply a rapid change against the previous URL state.
+    setParams(out, { replace: true, flushSync: true })
   }
 
   const ctx = useMemo<ShoppingContext>(

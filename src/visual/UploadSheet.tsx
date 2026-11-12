@@ -57,7 +57,10 @@ export function UploadSheet({ kind, householdId, roomId, onClose, onSaved }: { k
           if (!existing.data) throw saved.error
         }
         entry.state = 'done'
-      } catch (e) { entry.state = 'failed'; entry.error = errorMessage(e) }
+      } catch (e) {
+        entry.state = 'failed'; entry.error = errorMessage(e)
+        if (/expired/i.test(entry.error)) { entry.path = undefined; entry.thumb = undefined; entry.uploaded = false; entry.thumbUploaded = false }
+      }
       paint()
     }
     if (cancelled.current) queue.current.forEach(x => { if (x.state === 'waiting') x.state = 'cancelled' })

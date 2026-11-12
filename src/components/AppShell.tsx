@@ -19,7 +19,7 @@ import { ProfileIcon } from '@/design/icons'
 import { useHousehold } from '@/household/HouseholdProvider'
 import { ShoppingProvider } from '@/shopping/ShoppingProvider'
 import { ConnectionStatus } from './ConnectionStatus'
-import { Avatar } from './Avatar'
+import { Avatar, clearMediaCache } from './Avatar'
 import { useFocusTrap } from './Sheet'
 import { TourProvider, useTour } from './Tour'
 
@@ -34,6 +34,8 @@ const DrawerContext = createContext<{ open: () => void }>({ open: () => undefine
 export const useDrawer = () => useContext(DrawerContext)
 
 export function AppShell() {
+  const { household } = useHousehold()
+  useEffect(() => () => { clearMediaCache() }, [household?.id])
   const [drawerOpen, setDrawerOpen] = useState(false)
   const location = useLocation()
 

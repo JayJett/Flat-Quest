@@ -187,7 +187,7 @@ test('filters and sorting narrow the same checklist and survive a reload', async
   await expect(filters.getByRole('button', { name: 'Show 1 item' })).toBeVisible()
   await filters.getByLabel('Who').selectOption(madi)
   await filters.getByRole('button', { name: 'Show 1 item' }).click()
-  expect(await names()).toEqual(['Kettle'])
+  await expect.poll(names).toEqual(['Kettle'])
   await expect(page).toHaveURL(new RegExp(`who=${madi}`))
 
   await page.getByRole('button', { name: /Filter and sort, 1 filter on/ }).click()
@@ -195,10 +195,10 @@ test('filters and sorting narrow the same checklist and survive a reload', async
   await filters.getByLabel('Priority').selectOption('must_have')
   await filters.getByLabel('Stage').selectOption('ordered')
   await filters.getByRole('button', { name: 'Show 1 item' }).click()
-  expect(await names()).toEqual(['Toaster'])
+  await expect.poll(names).toEqual(['Toaster'])
   await page.reload()
   await expect(shoppingRow(page, 'Toaster')).toBeVisible()
-  expect(await names()).toEqual(['Toaster'])
+  await expect.poll(names).toEqual(['Toaster'])
   await expect(page.getByText('Must-have · Ordered')).toBeVisible()
 
   await page.getByRole('button', { name: 'Clear', exact: true }).click()
@@ -206,12 +206,12 @@ test('filters and sorting narrow the same checklist and survive a reload', async
   await filters.getByLabel('Sort by').selectOption('price')
   await filters.getByRole('button', { name: 'Show 3 items' }).click()
   // Cheapest known price first (an option's price beats the estimate); unknown prices last.
-  expect(await names()).toEqual(['Kettle', 'Plates', 'Toaster'])
+  await expect.poll(names).toEqual(['Kettle', 'Plates', 'Toaster'])
   await page.getByRole('button', { name: 'Filter and sort' }).click()
   await filters.getByLabel('Sort by').selectOption('name')
   await filters.getByLabel('Room').selectOption(rid)
   await filters.getByRole('button', { name: 'Show 3 items' }).click()
-  expect(await names()).toEqual(['Kettle', 'Plates', 'Toaster'])
+  await expect.poll(names).toEqual(['Kettle', 'Plates', 'Toaster'])
   await page.getByRole('button', { name: /Filter and sort/ }).click()
   await filters.getByRole('button', { name: 'Reset' }).click()
   await filters.getByRole('button', { name: 'Show 3 items' }).click()
@@ -275,7 +275,7 @@ test.describe('purchase coordination', () => {
 })
 
 test.describe('product options', () => {
-  test('photo upload: preview, failed save cleans up, retry saves once, replace and remove tidy the old file', async ({ page }) => {
+  test('photo upload: preview, retry saves once, and retired uploads remain registered for backend cleanup', async ({ page }) => {
     const state = await mockFlat(page)
     state.items[0]!.status = 'shopping'
     await page.goto('./rooms/shopping')
@@ -405,7 +405,7 @@ test.describe('product options', () => {
     expect(state.options[0]!.price).toBe(95)
   })
 
-  test('removing an option keeps the checklist item; deleting the item removes its option photos', async ({ page }) => {
+  test('removing an option keeps the checklist item; deleting the item preserves legacy photos', async ({ page }) => {
     const state = await mockFlat(page)
     state.items[0]!.status = 'shopping'
     state.files = [`${hid}/products/${kettle}-1.webp`]
