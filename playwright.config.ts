@@ -6,7 +6,7 @@ const chromium = process.env.PW_CHROMIUM_PATH ? { launchOptions: { executablePat
 export default defineConfig({
   testDir: './tests/browser',
   // The screenshot generator only runs on request: SHOTS=1 npx playwright test screenshots --project=desktop-chromium
-  testIgnore: process.env.SHOTS ? [] : ['**/screenshots.spec.ts'],
+  testIgnore: process.env.SHOTS ? [] : ['**/*screenshots.spec.ts'],
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,

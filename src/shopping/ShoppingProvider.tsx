@@ -238,14 +238,19 @@ export function ShoppingProvider({ children }: { children: ReactNode }) {
 
   // ---------------------------------------------------------------- options
   const removeFiles = useCallback(async (paths: string[]) => {
-    if (paths.length > 0) await supabase.storage.from('household-media').remove(paths)
+    // New product uploads are reclaimed by the scheduled backend after a grace
+    // period. Older photos remain protected pending explicit cleanup approval.
+    void paths
   }, [])
 
   const uploadPhoto = useCallback<ShoppingState['uploadPhoto']>(
     async (itemId, blob, ext) => {
       if (!hid) return { ok: false, error: 'No household' }
       if (!navigator.onLine) return { ok: false, error: OFFLINE }
-      const path = `${hid}/products/${itemId}-${Date.now()}.${ext}`
+      if (!itemId) return { ok: false, error: 'Choose an item first.' }
+      const reserved = await supabase.rpc('reserve_media_upload', { p_household: hid, p_kind: 'products', p_ext: ext })
+      if (reserved.error) return { ok: false, error: errorMessage(reserved.error) }
+      const path = (reserved.data as { path: string }).path
       const { error: err } = await supabase.storage
         .from('household-media')
         .upload(path, blob, { contentType: ext === 'webp' ? 'image/webp' : 'image/jpeg', upsert: false })

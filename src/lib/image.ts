@@ -28,7 +28,7 @@ function loadImage(file: File): Promise<HTMLImageElement> {
  * Downscales a photo (keeping its shape) to at most `maxEdge` px and re-encodes it
  * as WebP (JPEG fallback). Used for wishlist inspiration photos; strips EXIF.
  */
-export async function prepareImage(file: File, maxEdge = 1280): Promise<{ blob: Blob; ext: 'webp' | 'jpg' }> {
+export async function prepareImage(file: File, maxEdge = 1280): Promise<{ blob: Blob; ext: 'webp' | 'jpg'; width: number; height: number }> {
   const img = await loadImage(file)
   const scale = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight))
   const w = Math.max(1, Math.round(img.naturalWidth * scale))
@@ -42,10 +42,10 @@ export async function prepareImage(file: File, maxEdge = 1280): Promise<{ blob: 
   ctx.drawImage(img, 0, 0, w, h)
   const toBlob = (type: string) => new Promise<Blob | null>((r) => canvas.toBlob(r, type, 0.84))
   const webp = await toBlob('image/webp')
-  if (webp && webp.type === 'image/webp') return { blob: webp, ext: 'webp' }
+  if (webp && webp.type === 'image/webp') return { blob: webp, ext: 'webp', width: w, height: h }
   const jpg = await toBlob('image/jpeg')
   if (!jpg) throw new Error('Your browser couldn’t process the image.')
-  return { blob: jpg, ext: 'jpg' }
+  return { blob: jpg, ext: 'jpg', width: w, height: h }
 }
 
 /** The household-media bucket rejects anything larger (see the storage migration). */

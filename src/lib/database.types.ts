@@ -1,3 +1,4 @@
+import type { Visual, Transformation } from '@/visual/types'
 // Generated from the Supabase schema (supabase gen types / MCP generate_typescript_types),
 // trimmed to the parts the app uses. Regenerate after schema changes.
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
@@ -202,6 +203,8 @@ export type Database = {
   __InternalSupabase: { PostgrestVersion: '14.18' }
   public: {
     Tables: {
+      room_visuals: Table<Visual, 'household_id' | 'room_id' | 'kind'>
+      room_transformations: Table<Transformation, 'household_id' | 'room_id' | 'before_id' | 'after_id'>
       profiles: Table<ProfileRow, 'id'>
       households: Table<HouseholdRow, 'name'>
       household_members: Table<HouseholdMemberRow, 'household_id' | 'user_id'>
@@ -218,6 +221,7 @@ export type Database = {
     }
     Views: { [_ in never]: never }
     Functions: {
+      reserve_media_upload: { Args: { p_household: string; p_kind: string; p_ext: string }; Returns: Json }
       accept_household_invite: { Args: { p_code: string }; Returns: string }
       create_household: { Args: { p_name: string; p_address?: string }; Returns: string }
       create_household_invite: {

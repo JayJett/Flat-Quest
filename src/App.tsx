@@ -1,7 +1,8 @@
 import { lazy, Suspense } from 'react'
 import { FullScreenLoader } from '@/auth/guards'
 import { MotionConfig } from 'motion/react'
-import { createBrowserRouter, Navigate, Outlet, RouterProvider } from 'react-router'
+import { createBrowserRouter, Navigate, Outlet } from 'react-router'
+import { RouterProvider } from 'react-router/dom'
 import { AuthProvider } from '@/auth/AuthProvider'
 import { RequireAuth, RequireHousehold } from '@/auth/guards'
 import { AppShell } from '@/components/AppShell'
@@ -18,6 +19,7 @@ const HomePage = lazy(() => import('@/pages/Home').then((m) => ({ default: m.Hom
 const ProfilePage = lazy(() => import('@/pages/Profile').then((m) => ({ default: m.ProfilePage })))
 const RoomDetailPage = lazy(() => import('@/pages/RoomDetail').then((m) => ({ default: m.RoomDetailPage })))
 const RoomsPage = lazy(() => import('@/pages/Rooms').then((m) => ({ default: m.RoomsPage })))
+const VisualHomePage = lazy(() => import('@/pages/VisualHome').then((m) => ({ default: m.VisualHomePage })))
 const ShoppingPage = lazy(() => import('@/pages/Shopping').then((m) => ({ default: m.ShoppingPage })))
 const SettingsPage = lazy(() => import('@/pages/Settings').then((m) => ({ default: m.SettingsPage })))
 const SignInPage = lazy(() => import('@/pages/SignIn').then((m) => ({ default: m.SignInPage })))
@@ -62,6 +64,7 @@ const router = createBrowserRouter([
           { path: 'rooms', element: <RoomsPage /> },
           { path: 'rooms/shopping', element: <ShoppingPage /> },
           { path: 'rooms/:roomId', element: <RoomDetailPage /> },
+          { path: 'rooms/:roomId/visual', element: <VisualHomePage /> },
           { path: 'wishlist', element: <WishlistPage /> },
           { path: 'flatmates', element: <FlatmatesPage /> },
           { path: 'flatmates/:userId', element: <FlatmateItemsPage /> },

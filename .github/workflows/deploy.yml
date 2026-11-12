@@ -64,6 +64,12 @@ jobs:
         run: psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -v ON_ERROR_STOP=1 -f supabase/tests/rls_verification.sql
       - name: Concurrent claims, selections and preferences (separate connections)
         run: FLATQUEST_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres supabase/tests/coordinator_race.sh
+      - name: Visual Home access and media lifecycle
+        run: psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -v ON_ERROR_STOP=1 -f supabase/tests/phase5_verification.sql
+      - name: Real private Storage API isolation
+        run: |
+          supabase status -o json > "$RUNNER_TEMP/local-supabase.json"
+          node scripts/verify-visual-storage.mjs "$RUNNER_TEMP/local-supabase.json"
       - name: Stop local Supabase
         if: always()
         run: supabase stop --no-backup
