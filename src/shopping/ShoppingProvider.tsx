@@ -596,4 +596,3 @@ export function useShopping(): ShoppingState {
   if (!ctx) throw new Error('useShopping must be used inside <ShoppingProvider>')
   return ctx
 }
-

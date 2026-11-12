@@ -15,4 +15,3 @@ export function Comparison({ before, after }: { before: Visual; after: Visual })
     <div className="mt-3 flex justify-center gap-2">{(['before','compare','after'] as const).map(value => <button key={value} aria-pressed={mode === value} onClick={() => setMode(value)} className={`pressable min-h-11 rounded-full px-4 text-sm font-semibold ${mode === value ? 'bg-ink text-white' : 'bg-surface-2'}`}>{value === 'compare' ? 'Compare' : value === 'before' ? 'Before' : 'After'}</button>)}</div>
   </div>
 }
-

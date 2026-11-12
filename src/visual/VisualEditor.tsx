@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Sheet } from '@/components/Sheet'
 import { Button, Field } from '@/components/ui'
 import { supabase, errorMessage } from '@/lib/supabase'
 import { safeSource, type Visual } from './types'
 
 export function VisualEditor({ visual, householdId, roomId, onClose, onSaved }: { visual: Visual | null; householdId: string; roomId: string; onClose: () => void; onSaved: () => Promise<void> }) {
+  const id = useId()
   const [title, setTitle] = useState(visual?.title ?? '')
   const [notes, setNotes] = useState(visual?.notes ?? '')
   const [url, setUrl] = useState(visual?.source_url ?? '')
@@ -28,13 +29,12 @@ export function VisualEditor({ visual, householdId, roomId, onClose, onSaved }: 
   }
   return <Sheet open onClose={onClose} busy={busy} title={visual ? 'A little more detail' : 'Save an inspiration link'}>
     <form className="space-y-4" onSubmit={e => { e.preventDefault(); void save() }}>
-      <Field label="Title (optional)"><input className="field" maxLength={120} value={title} onChange={e => setTitle(e.target.value)} /></Field>
-      <Field label={visual?.photo_path ? 'Link (optional)' : 'Link'}><input className="field" type="url" maxLength={1000} value={url} onChange={e => setUrl(e.target.value)} placeholder="https://" /></Field>
-      {visual?.kind === 'photo' && <Field label="Date taken (optional)"><input className="field" type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>}
-      <Field label="Notes (optional)"><textarea className="field" maxLength={1000} rows={3} value={notes} onChange={e => setNotes(e.target.value)} /></Field>
+      <Field label="Title (optional)" htmlFor={`${id}-title`}><input id={`${id}-title`} className="field" maxLength={120} value={title} onChange={e => setTitle(e.target.value)} /></Field>
+      <Field htmlFor={`${id}-url`} label={visual?.photo_path ? 'Link (optional)' : 'Link'}><input id={`${id}-url`} className="field" type="url" maxLength={1000} value={url} onChange={e => setUrl(e.target.value)} placeholder="https://" /></Field>
+      {visual?.kind === 'photo' && <Field label="Date taken (optional)" htmlFor={`${id}-date`}><input id={`${id}-date`} className="field" type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>}
+      <Field label="Notes (optional)" htmlFor={`${id}-notes`}><textarea id={`${id}-notes`} className="field" maxLength={1000} rows={3} value={notes} onChange={e => setNotes(e.target.value)} /></Field>
       {error && <p role="alert" className="text-danger text-sm">{error}</p>}
       <Button type="submit" block loading={busy}>Save</Button>
     </form>
   </Sheet>
 }
-

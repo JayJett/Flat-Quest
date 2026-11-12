@@ -50,7 +50,7 @@ export function UploadSheet({ kind, householdId, roomId, onClose, onSaved }: { k
           entry.thumbUploaded = true
         }
         if (cancelled.current) { entry.state = 'cancelled'; paint(); break }
-        const saved = await supabase.from('room_visuals').insert({ id: entry.id, household_id: householdId, room_id: roomId, kind, photo_path: entry.path, thumbnail_path: entry.thumb, sort_order: Date.now() })
+        const saved = await supabase.from('room_visuals').insert({ id: entry.id, household_id: householdId, room_id: roomId, kind, photo_path: entry.path, thumbnail_path: entry.thumb, aspect_ratio: main.width / main.height, sort_order: Date.now() })
         if (saved.error) {
           // A retry after a lost response must not create a second card.
           const existing = await supabase.from('room_visuals').select('id').eq('id', entry.id).maybeSingle()
@@ -83,4 +83,3 @@ export function UploadSheet({ kind, householdId, roomId, onClose, onSaved }: { k
     <div className="mt-6">{busy ? <Button variant="secondary" block icon={<X size={18} />} onClick={() => { cancelled.current = true }}>Stop remaining uploads</Button> : <Button block onClick={onClose}>Done</Button>}</div>
   </Sheet>
 }
-

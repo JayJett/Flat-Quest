@@ -75,4 +75,3 @@ test('source-only inspiration is quick to save and safe to open', async ({ page 
   await page.getByLabel('Link', { exact: true }).fill('https://example.com/room'); await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect.poll(() => state.visuals.length).toBe(1); await expect(page.getByRole('link', { name: 'example.com' })).toHaveAttribute('rel', 'noopener noreferrer')
 })
-

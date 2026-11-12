@@ -278,4 +278,3 @@ export async function mockFlat(page: Page, tour = false, opts: { flatmates?: boo
 export async function resync(page: Page) {
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
 }
-

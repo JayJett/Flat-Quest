@@ -79,4 +79,3 @@ const router = createBrowserRouter([
 export default function App() {
   return <Suspense fallback={<FullScreenLoader />}><RouterProvider router={router} /></Suspense>
 }
-

@@ -68,7 +68,7 @@ function VisualRoom({ room, householdId }: { room: ReturnType<typeof useHousehol
     await load(); setBusy(false); setMenu(null)
   }
   const grid = (rows: Visual[], full: boolean) => <div className="columns-2 gap-3 md:columns-3 lg:gap-4">{(full ? rows : rows.slice(0, 6)).map((v, i) => <motion.article key={v.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.18 }} className="mb-4 break-inside-avoid">
-    {v.photo_path ? <button className="pressable bg-surface-2 block w-full overflow-hidden rounded-[20px]" aria-label={`View ${v.title || `photo ${i + 1}`}`} onClick={() => setViewer(v)}><MediaImage path={v.thumbnail_path} alt={v.title || ''} className="h-auto w-full" /></button>
+    {v.photo_path ? <button style={{ aspectRatio: v.aspect_ratio || 1 }} className="pressable bg-surface-2 block w-full overflow-hidden rounded-[20px]" aria-label={`View ${v.title || `photo ${i + 1}`}`} onClick={() => setViewer(v)}><MediaImage path={v.thumbnail_path} alt={v.title || ''} className="h-full w-full object-contain" /></button>
       : <a href={v.source_url!} target="_blank" rel="noopener noreferrer" className="pressable bg-surface-2 flex min-h-40 flex-col justify-between rounded-[20px] p-4"><ArrowUpRight size={24} /><span className="break-words font-bold">{v.title || new URL(v.source_url!).hostname}</span></a>}
     <div className="flex items-start justify-between gap-1 pt-1"><div className="min-w-0 pl-1 pt-2">{v.title && v.photo_path && <p className="break-words text-sm font-bold">{v.title}</p>}<p className="text-ink-3 truncate text-xs">{memberById.get(v.created_by ?? '')?.profile.display_name || 'A flatmate'}{v.taken_on ? ` · ${v.taken_on}` : ''}</p></div><button className="pressable flex h-11 w-11 shrink-0 items-center justify-center rounded-full" aria-label={`Options for ${v.title || `photo ${i + 1}`}`} onClick={() => setMenu(v)}><Ellipsis size={20} /></button></div>
   </motion.article>)}</div>
@@ -107,4 +107,3 @@ function VisualRoom({ room, householdId }: { room: ReturnType<typeof useHousehol
     <ConfirmSheet open={!!removing} title={removing && 'kind' in removing ? 'Remove this photo or idea?' : 'Remove this transformation?'} body={removing && 'kind' in removing ? transformations.some(t => t.before_id === removing.id || t.after_id === removing.id) ? 'This also removes comparisons using this photo. The other photos will stay.' : 'This removes it from the shared room gallery.' : 'The original flat photos will stay in your gallery.'} confirmLabel="Remove" danger busy={busy} onConfirm={() => void remove()} onClose={() => setRemoving(null)} />
   </>
 }
-

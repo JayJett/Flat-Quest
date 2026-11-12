@@ -30,4 +30,3 @@ Deno.serve(async (req: Request) => {
     return Response.json({ error: 'Cleanup failed' }, { status: 500 })
   }
 })
-

@@ -105,4 +105,3 @@ begin
  raise notice 'Phase 5 access and lifecycle checks complete';
 end $$;
 rollback;
-

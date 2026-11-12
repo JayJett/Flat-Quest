@@ -9,4 +9,3 @@ describe('visual board links and ordering', () => {
   it('moves to the edges', () => { expect(movedOrder(rows, 1, -1)).toBe(-1024); expect(movedOrder(rows, 1, 1)).toBe(3072) })
   it('does not move outside the board', () => { expect(movedOrder(rows, 0, -1)).toBe(0); expect(movedOrder(rows, 2, 1)).toBe(2048) })
 })
-

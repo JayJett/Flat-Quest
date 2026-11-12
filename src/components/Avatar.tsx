@@ -163,4 +163,3 @@ export function AvatarGroup({
     </span>
   )
 }
-

@@ -9,6 +9,7 @@ create table public.room_visuals (
   kind text not null check (kind in ('inspiration','photo')),
   photo_path text,
   thumbnail_path text,
+  aspect_ratio double precision not null default 1 check(aspect_ratio > 0 and aspect_ratio < 1000),
   title text check (char_length(title) <= 120),
   notes text check (char_length(notes) <= 1000),
   source_url text check (char_length(source_url) <= 1000 and source_url ~* '^https?://[^[:space:]]+$'),
@@ -53,7 +54,7 @@ alter table public.room_visuals enable row level security;
 alter table public.room_transformations enable row level security;
 revoke all on public.room_visuals, public.room_transformations from anon, authenticated;
 grant select, delete on public.room_visuals, public.room_transformations to authenticated;
-grant insert(id,household_id,room_id,kind,photo_path,thumbnail_path,title,notes,source_url,taken_on,sort_order),
+grant insert(id,household_id,room_id,kind,photo_path,thumbnail_path,aspect_ratio,title,notes,source_url,taken_on,sort_order),
  update(title,notes,source_url,taken_on,sort_order) on public.room_visuals to authenticated;
 grant insert(household_id,room_id,before_id,after_id,title,notes), update(before_id,after_id,title,notes) on public.room_transformations to authenticated;
 create policy "visuals: members" on public.room_visuals for all to authenticated
@@ -109,8 +110,10 @@ create trigger guard_product_attachment before insert or update of photo_path on
 
 create function private.visual_updated() returns trigger language plpgsql set search_path='' as $$
 begin
- if tg_table_name='room_transformations' and exists(select 1 from public.room_visuals where id in(new.before_id,new.after_id) and kind <> 'photo') then
-   raise exception 'Choose two flat photos' using errcode='23514';
+ if tg_table_name='room_transformations' then
+   if exists(select 1 from public.room_visuals where id in(new.before_id,new.after_id) and kind <> 'photo') then
+     raise exception 'Choose two flat photos' using errcode='23514';
+   end if;
  end if;
  new.updated_at:=clock_timestamp();
  return new;
@@ -180,4 +183,3 @@ language sql security definer set search_path='' as $$
 $$;
 revoke all on function public.authorize_media_cleanup(text) from public,anon,authenticated;
 grant execute on function public.authorize_media_cleanup(text) to service_role;
-

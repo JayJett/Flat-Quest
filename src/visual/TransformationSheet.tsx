@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Sheet } from '@/components/Sheet'
 import { Button, Field } from '@/components/ui'
 import { supabase, errorMessage } from '@/lib/supabase'
@@ -8,6 +8,7 @@ import type { Transformation, Visual } from './types'
 export function TransformationSheet({ photos, householdId, roomId, existing, onClose, onSaved }: { photos: Visual[]; householdId: string; roomId: string; existing?: Transformation; onClose: () => void; onSaved: () => Promise<void> }) {
   const [before, setBefore] = useState(existing?.before_id ?? '')
   const [after, setAfter] = useState(existing?.after_id ?? '')
+  const id = useId()
   const [title, setTitle] = useState(existing?.title ?? '')
   const [notes, setNotes] = useState(existing?.notes ?? '')
   const [busy, setBusy] = useState(false)
@@ -29,9 +30,8 @@ export function TransformationSheet({ photos, householdId, roomId, existing, onC
   return <Sheet open onClose={onClose} busy={busy} title={existing ? 'Edit transformation' : 'Look how far we’ve come'}>
     <p className="text-ink-2 mb-4">Pick a before and an after. Similar angles work beautifully.</p>
     {(['Before','After'] as const).map(label => <fieldset className="mb-5" key={label}><legend className="mb-2 font-bold">{label}</legend><div className="flex gap-2 overflow-x-auto pb-2">{photos.map((p, i) => <button key={p.id} aria-label={`${label}: ${p.title || `photo ${i + 1}`}`} aria-pressed={(label === 'Before' ? before : after) === p.id} className={`pressable w-24 shrink-0 overflow-hidden rounded-xl border-2 ${(label === 'Before' ? before : after) === p.id ? 'border-accent' : 'border-transparent'}`} onClick={() => label === 'Before' ? setBefore(p.id) : setAfter(p.id)}><MediaImage path={p.thumbnail_path} className="aspect-square h-24 w-full object-cover" /></button>)}</div></fieldset>)}
-    <div className="space-y-4"><Field label="Title (optional)"><input className="field" maxLength={120} value={title} onChange={e => setTitle(e.target.value)} /></Field><Field label="Notes (optional)"><textarea className="field" maxLength={1000} rows={2} value={notes} onChange={e => setNotes(e.target.value)} /></Field></div>
+    <div className="space-y-4"><Field label="Title (optional)" htmlFor={`${id}-title`}><input id={`${id}-title`} className="field" maxLength={120} value={title} onChange={e => setTitle(e.target.value)} /></Field><Field label="Notes (optional)" htmlFor={`${id}-notes`}><textarea id={`${id}-notes`} className="field" maxLength={1000} rows={2} value={notes} onChange={e => setNotes(e.target.value)} /></Field></div>
     {error && <p role="alert" className="text-danger mt-4 text-sm">{error}</p>}
     <Button className="mt-5" block loading={busy} disabled={!before || !after || before === after} onClick={() => void save()}>Save transformation</Button>
   </Sheet>
 }
-

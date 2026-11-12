@@ -245,4 +245,3 @@ export function goBack(navigate: ReturnType<typeof useNavigate>, fallback: strin
   if (idx > 0) navigate(-1)
   else navigate(fallback, { replace: true })
 }
-

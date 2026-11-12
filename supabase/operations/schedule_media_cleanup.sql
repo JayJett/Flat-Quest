@@ -20,4 +20,3 @@ select cron.schedule('flatquest-media-cleanup','17 * * * *', $job$
    body:='{"dry_run":false}'::jsonb, timeout_milliseconds:=30000
  );
 $job$);
-

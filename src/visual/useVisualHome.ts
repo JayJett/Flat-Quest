@@ -47,4 +47,3 @@ export function useVisualHome(householdId: string, roomId: string) {
   }, [householdId, roomId, load])
   return { visuals, transformations, loading, error, load, more, loadMore: () => setLimit(x => x + 60) }
 }
-

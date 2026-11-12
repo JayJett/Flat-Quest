@@ -34,4 +34,3 @@ export function PhotoViewer({ photos, initial, onClose }: { photos: Visual[]; in
     </div>
   </motion.div>, document.body)
 }
-

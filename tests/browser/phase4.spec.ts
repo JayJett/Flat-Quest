@@ -710,4 +710,3 @@ test('wishlist still works and stays separate from product preferences', async (
   await expect(page.getByRole('button', { name: 'Vote for A reading lamp' })).toBeVisible()
   expect(state.preferences).toEqual([])
 })
-
