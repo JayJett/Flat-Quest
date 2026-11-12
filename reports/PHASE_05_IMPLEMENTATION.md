@@ -1,6 +1,6 @@
 # Phase 5 — Visual Home
 
-Status: implementation and release verification in progress. Production deployment details will be completed after verification.
+Status: **deployed and verified**, 12 November 2026 UTC. [Open Flat Quest](https://jayjett.github.io/Flat-Quest/).
 
 ## Scope and preservation
 
@@ -71,7 +71,7 @@ Production backend verified on 12 November 2026 UTC:
 
 - Edge Function `media-cleanup`, version 1, is ACTIVE. Requests without its dedicated token return HTTP 401.
 - Authenticated dry run returned HTTP 200 with zero candidates, deletions and failures. An actual Cron-triggered dry run succeeded at 08:06 UTC, also returning HTTP 200 with zero candidates.
-- After explicit user approval for cleanup of new Phase 5 uploads, job `flatquest-media-cleanup` was enabled hourly at minute 17 UTC (`17 * * * *`) with `dry_run:false`. An authenticated live-mode verification returned HTTP 200: zero candidates, zero deleted, zero failed. No historical object was enrolled or deleted.
+- After explicit user approval for cleanup of new Phase 5 uploads, job `flatquest-media-cleanup` was enabled hourly at minute 17 UTC (`17 * * * *`) with `dry_run:false`. Both an authenticated live-mode verification and the actual hourly run at 08:17 UTC returned HTTP 200: zero candidates, zero deleted, zero failed. No historical object was enrolled or deleted.
 - Vault holds the scheduler token; the database holds its hash. The browser has neither. The registry was empty at verification, with both historical storage objects still present.
 - Read-only fingerprints of items, rooms, product options, profiles, wishlist, assignments and purchases matched the pre-migration baseline. Both Phase 4 recovery tables remain present and untouched.
 
@@ -96,7 +96,8 @@ Relevant guidance: [privileged function advisories](https://supabase.com/docs/gu
 - All eight `scripts/verify-visual-storage.mjs` checks pass using real private Storage HTTP operations against localhost only: uploads, signing, outsider denial, immutable reserved files, protected deletion and worker-RPC denial. It refuses a non-local API URL.
 - Browser fixtures cover the room switch, effortless multi-upload, retry idempotency, full-screen viewing and zoom, optional-field conflicts, reordering/removal, transformation creation/comparison/removal and safe source-only ideas. All fixture HTTP/WebSocket traffic to the production Supabase host is intercepted.
 - Initial checks caught and fixed missing editor label associations, a shared trigger referencing a field absent from photo rows, Safari focus restoration, and rapid shopping-filter changes reading stale URL state. The filter fix uses the DOM RouterProvider and synchronous navigation; existing behaviour and URL persistence remain covered by regression tests.
-- Browser regression coverage also verifies comparisons referencing photos beyond the first page and closing a viewer when a flatmate removes its last photo. Final browser totals and release CI identifiers are recorded below.
+- Browser regression coverage also verifies comparisons referencing photos beyond the first page and closing a viewer when a flatmate removes its last photo. Final total: **126 passed, 3 intentional skips** across desktop Chromium, small-screen WebKit and reduced-motion configurations. The skips restrict the service-worker check to Chromium and the dedicated motion assertion to its relevant project.
+- Final feature-branch CI: [run 43181791137](https://github.com/JayJett/Flat-Quest/actions/runs/43181791137), all required jobs successful for `6ca31e85fac11580c9354ac50443ebd194b015f8`.
 
 ## Visual evidence
 
@@ -115,13 +116,20 @@ These screenshots use invented room illustrations and test accounts, not live ho
 
 Existing GitHub Actions workflow retained: lint, unit tests, production build, isolated browser tests, disposable database checks, then GitHub Pages publish. Added Visual Home database and real Storage checks to the existing database job. Production migrations and Edge deployment are verified separately; Pages remains a static frontend.
 
-Final production migration, worker version, scheduler execution, PR merge, Pages run and live-site checks: pending.
+Production schema migrations and four covering indexes are deployed. Edge Function version 1 and the approved hourly schedule are verified above. [PR #4](https://github.com/JayJett/Flat-Quest/pull/4) merged as `bac4a3da3857da8f1b4777ad06b2facf516d02f3`.
+
+Pages release: [run 43182860132](https://github.com/JayJett/Flat-Quest/actions/runs/43182860132), **Check and build**, **Local database access tests**, and **Publish** all successful. The deployed application revision is `bac4a3da3857da8f1b4777ad06b2facf516d02f3`.
+
+Live checks after publication: home HTTP 200; entry bundle `index-D81wwUU6.js`; Visual Home bundle `VisualHome-8jaqWgVA.js` HTTP 200; a direct room/visual URL returns the expected GitHub Pages HTTP 404 fallback containing the same app entry bundle. A fresh 390×844 Chromium session displayed the existing sign-in page with zero application exceptions. No household login or production content mutation was used for this smoke check.
+
+The final report-only follow-up records evidence obtained after deployment. It changes no application, database, workflow or media files, and uses a separate documentation PR with CI skipped to avoid an identical frontend redeployment.
 
 Rollback approach: revert the frontend through the existing Pages workflow, retain additive tables and all new user media, and disable the cleanup schedule if needed. Do not drop tables, restore over live records, delete snapshots or purge storage as a rollback shortcut. Restoring the prior frontend does not require removing the new schema.
 
 ## Practical limits
 
 - Physical iPhone hardware, native HEIC conversion across all devices and pinch-zoom gestures are not claimed as verified. The viewer provides explicit zoom and browser touch scrolling; automated coverage includes small-screen WebKit.
+- Authenticated production content writes and two-device Realtime collaboration were not exercised against the household. Browser scenarios use isolated fixtures; permissions, concurrency and Storage operations are tested against disposable Supabase. Production verification uses read-only data checks and authenticated backend cleanup with zero candidates.
 - Rearranging uses accessible earlier/later controls, not freeform canvas or drag-and-drop board editing.
 - No automatic website scraping, public sharing, AI redesign, video, or Phase 6 features.
 - Existing wishlist/product information is preserved. Visual inspiration can carry a source link; this release does not duplicate purchasing state or introduce a separate shopping list.
