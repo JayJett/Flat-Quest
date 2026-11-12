@@ -14,20 +14,22 @@ export function useVisualHome(householdId: string, roomId: string) {
     const current = ++generation.current
     const [v, t] = await Promise.all([
       supabase.from('room_visuals').select('*').eq('household_id', householdId).eq('room_id', roomId).order('sort_order').order('id').limit(limit + 1),
-      supabase.from('room_transformations').select('*').eq('household_id', householdId).eq('room_id', roomId).order('created_at', { ascending: false }).limit(100),
+      supabase.from('room_transformations').select('*').eq('household_id', householdId).eq('room_id', roomId).order('created_at', { ascending: false }).limit(limit + 1),
     ])
     if (current !== generation.current) return
     if (v.error || t.error) setError(errorMessage(v.error || t.error))
     else {
       // Fetch referenced photos outside the current gallery page for comparisons.
-      const missing = [...new Set((t.data ?? []).flatMap(x => [x.before_id, x.after_id]))].filter(id => !v.data?.some(x => x.id === id))
+      const visible = (v.data ?? []).slice(0, limit)
+      const pairs = (t.data ?? []).slice(0, limit)
+      const missing = [...new Set(pairs.flatMap(x => [x.before_id, x.after_id]))].filter(id => !visible.some(x => x.id === id))
       const extra = missing.length ? await supabase.from('room_visuals').select('*').eq('room_id', roomId).in('id', missing) : { data: [] as Visual[], error: null }
       if (current !== generation.current) return
       if (extra.error) setError(errorMessage(extra.error))
       else {
-        setVisuals([...(v.data ?? []).slice(0, limit), ...(extra.data ?? [])])
-        setTransformations(t.data ?? [])
-        setMore((v.data?.length ?? 0) > limit)
+        setVisuals([...visible, ...(extra.data ?? [])].sort((a,b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id)))
+        setTransformations(pairs)
+        setMore((v.data?.length ?? 0) > limit || (t.data?.length ?? 0) > limit)
         setError(null)
       }
     }

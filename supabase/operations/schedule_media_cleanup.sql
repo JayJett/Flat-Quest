@@ -2,10 +2,8 @@
 -- objects are enrolled. Do not print the secret or copy it into app configuration.
 create extension if not exists pg_cron;
 create extension if not exists pg_net with schema extensions;
--- Only the scheduler's database owner uses net; browser roles need no access.
-revoke usage on schema net from public, anon, authenticated;
-revoke all on all functions in schema net from public, anon, authenticated;
-revoke all on all tables in schema net from public, anon, authenticated;
+-- Hosted pg_net objects are platform-owned in the non-API net schema. Do not
+-- claim that project-owner REVOKE statements change platform-owned grants.
 do $$
 declare token text;
 begin

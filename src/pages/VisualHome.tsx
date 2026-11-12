@@ -43,6 +43,7 @@ function VisualRoom({ room, householdId }: { room: ReturnType<typeof useHousehol
   const [removing, setRemoving] = useState<Visual | Transformation | null>(null)
   const [busy, setBusy] = useState(false)
   const toast = useToast()
+  if (viewer && !visuals.some(v => v.id === viewer.id)) setViewer(null)
   const c = roomColor(room.color)
   const photos = visuals.filter(v => v.kind === 'photo')
   const inspirations = visuals.filter(v => v.kind === 'inspiration')
@@ -100,7 +101,7 @@ function VisualRoom({ room, householdId }: { room: ReturnType<typeof useHousehol
     </div>
     {upload && <UploadSheet kind={upload} householdId={householdId} roomId={room.id} onClose={() => setUpload(null)} onSaved={load} />}
     {editing && <VisualEditor visual={editing === 'link' ? null : editing} householdId={householdId} roomId={room.id} onClose={() => setEditing(null)} onSaved={load} />}
-    {viewer && <PhotoViewer photos={grouped[viewer.kind].filter(p => p.photo_path)} initial={viewer.id} onClose={() => setViewer(null)} />}
+    {viewer && grouped[viewer.kind].some(p => p.photo_path) && <PhotoViewer photos={grouped[viewer.kind].filter(p => p.photo_path)} initial={viewer.id} onClose={() => setViewer(null)} />}
     {pair && <TransformationSheet photos={photos} existing={pair === 'new' ? undefined : pair} householdId={householdId} roomId={room.id} onClose={() => setPair(null)} onSaved={load} />}
     {menu && <Sheet open onClose={() => setMenu(null)} title={menu.title || 'Photo options'} busy={busy}><div className="flex flex-col gap-2"><Button variant="secondary" onClick={() => { setEditing(menu); setMenu(null) }}>Edit details</Button>{menu.source_url && <a className="pressable min-h-12 py-3 text-center font-semibold" href={menu.source_url} target="_blank" rel="noopener noreferrer">Open source link</a>}<div className="flex gap-2"><Button variant="secondary" block disabled={grouped[menu.kind][0]?.id === menu.id || busy} icon={<ArrowUp size={18} />} onClick={() => void move(menu, -1)}>Move earlier</Button><Button variant="secondary" block disabled={grouped[menu.kind].at(-1)?.id === menu.id || busy} icon={<ArrowDown size={18} />} onClick={() => void move(menu, 1)}>Move later</Button></div><Button variant="danger" onClick={() => { setRemoving(menu); setMenu(null) }}>Remove</Button></div></Sheet>}
     {comparison && <Sheet open onClose={() => setComparison(null)} title={comparison.title || 'Before & after'}>{(() => { const before = visuals.find(v => v.id === comparison.before_id); const after = visuals.find(v => v.id === comparison.after_id); return before && after ? <Comparison before={before} after={after} /> : <p>This comparison has changed. Close it to refresh.</p> })()}{comparison.notes && <p className="text-ink-2 mt-4">{comparison.notes}</p>}<div className="mt-5 flex gap-2"><Button variant="secondary" block onClick={() => { setPair(comparison); setComparison(null) }}>Edit</Button><Button variant="danger" block onClick={() => setRemoving(comparison)}>Remove</Button></div></Sheet>}

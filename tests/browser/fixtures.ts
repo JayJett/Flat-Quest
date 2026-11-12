@@ -96,7 +96,11 @@ export async function mockFlat(page: Page, tour = false, opts: { flatmates?: boo
     }
     if (table === 'room_visuals' || table === 'room_transformations') {
       const collection = table === 'room_visuals' ? state.visuals : state.transformations
-      if (method === 'GET') return rows(q('id') ? collection.filter(x => x.id === q('id')) : collection)
+      if (method === 'GET') {
+        const ids = url.searchParams.get('id')
+        const list = q('id') ? collection.filter(x => x.id === q('id')) : ids?.startsWith('in.') ? collection.filter(x => ids.slice(4,-1).split(',').includes(x.id)) : collection
+        return rows(list.slice(0, Number(url.searchParams.get('limit') || list.length)))
+      }
       if (state.failVisualSave) return dbError('500', 'Gallery save unavailable', 500)
       if (method === 'POST') {
         const row = { id: `99999999-9999-4999-8999-${String(++tick).padStart(12, '0')}`, title: null, notes: null, source_url: null, taken_on: null, photo_path: null, thumbnail_path: null, created_by: uid, created_at: stamp(), updated_at: stamp(), ...body }

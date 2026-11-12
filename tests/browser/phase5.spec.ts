@@ -75,3 +75,23 @@ test('source-only inspiration is quick to save and safe to open', async ({ page 
   await page.getByLabel('Link', { exact: true }).fill('https://example.com/room'); await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect.poll(() => state.visuals.length).toBe(1); await expect(page.getByRole('link', { name: 'example.com' })).toHaveAttribute('rel', 'noopener noreferrer')
 })
+
+test('comparisons retain photos just beyond a gallery page', async ({ page }) => {
+  const state = await mockFlat(page)
+  state.visuals = Array.from({ length: 61 }, (_, i) => photo(String(i + 1)))
+  state.transformations = [{ id: 'pair', household_id: hid, room_id: rid, before_id: '1', after_id: '61', title: 'Across pages', notes: null, created_by: uid, created_at: now, updated_at: now }]
+  await page.goto(path)
+  await expect(page.getByRole('button', { name: /Before After Across pages/ })).toBeVisible()
+  await page.getByRole('button', { name: 'Load more photos' }).click()
+  await expect(page.getByRole('button', { name: 'Load more photos' })).toHaveCount(0)
+})
+
+test('a flatmate removing the last photo closes the viewer and releases scroll', async ({ page }) => {
+  const state = await mockFlat(page); state.visuals = [photo('1', 'photo', 'Last photo')]
+  await page.goto(path); await page.getByRole('button', { name: 'View Last photo' }).click()
+  await expect(page.getByRole('dialog', { name: 'Photo viewer' })).toBeVisible()
+  state.visuals = []
+  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+  await expect(page.getByRole('dialog', { name: 'Photo viewer' })).toHaveCount(0)
+  await expect.poll(() => page.evaluate(() => document.body.style.overflow)).not.toBe('hidden')
+})

@@ -67,7 +67,13 @@ Product upload/replacement/option deletion/item deletion now rely on the same du
 
 Pre-implementation dry run: two household-media objects existed (one household photo, one product photo). Both were referenced. No existing orphan was established and no existing object was deleted. Historical objects are excluded from automated deletion irrespective of future reference changes. Any historical cleanup requires a separate inventory and explicit user approval.
 
-Operational verification and final scheduler status: pending release verification.
+Production backend verified on 12 November 2026 UTC:
+
+- Edge Function `media-cleanup`, version 1, is ACTIVE. Requests without its dedicated token return HTTP 401.
+- Authenticated dry run returned HTTP 200 with zero candidates, deletions and failures. An actual Cron-triggered dry run succeeded at 08:06 UTC, also returning HTTP 200 with zero candidates.
+- After explicit user approval for cleanup of new Phase 5 uploads, job `flatquest-media-cleanup` was enabled hourly at minute 17 UTC (`17 * * * *`) with `dry_run:false`. An authenticated live-mode verification returned HTTP 200: zero candidates, zero deleted, zero failed. No historical object was enrolled or deleted.
+- Vault holds the scheduler token; the database holds its hash. The browser has neither. The registry was empty at verification, with both historical storage objects still present.
+- Read-only fingerprints of items, rooms, product options, profiles, wishlist, assignments and purchases matched the pre-migration baseline. Both Phase 4 recovery tables remain present and untouched.
 
 ## Security review
 
@@ -75,7 +81,9 @@ Operational verification and final scheduler status: pending release verificatio
 - Reviewed the ten existing member-callable SECURITY DEFINER entry points. They have fixed empty search paths, deny anonymous execution and use identity, membership or invite-token checks appropriate to their purpose. Existing invite, import, conversion and household-photo functions were retained; they were not disabled merely to clear advisor warnings.
 - The two Phase 4 backup tables remain deliberately inaccessible. New private worker tables follow the same deny-by-default approach.
 - Supabase organization plan verified as **Free**. Leaked-password protection remains disabled because it requires Pro or above; no subscription was changed. Reference: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection.
-- Dependency audit identified a moderate development-toolchain minimatch advisory propagated through ESLint/TypeScript-ESLint. A forced breaking toolchain replacement was not performed as part of this feature. Production-only audit and final advisor results are recorded below after verification.
+- Dependency audit identified a moderate development-toolchain minimatch advisory propagated through ESLint/TypeScript-ESLint. A forced breaking toolchain replacement was not performed as part of this feature. `npm audit --omit=dev` reported zero vulnerabilities.
+- Four missing foreign-key covering indexes were added in `20261112080431_visual_foreign_key_indexes.sql`, verified in CI and deployed. The final performance advisor reports no unindexed foreign keys.
+- Remaining security notices are the deliberate private-table deny-all RLS posture, eleven reviewed member-callable privileged functions (including upload reservation), unavailable Free-plan leaked-password protection, and pg_net extension placement metadata. pg_net functions actually live in the non-API `net` schema; the extension is non-relocatable and platform-owned. Project-owner REVOKE attempts did not change its platform grants and are not claimed as hardening. Destructive extension recreation was avoided. See [extension placement guidance](https://supabase.com/docs/guides/database/database-linter?lint=0014_extension_in_public).
 
 Relevant guidance: [privileged function advisories](https://supabase.com/docs/guides/observability/advisors?lint=0029_authenticated_security_definer_function_executable), [Storage deletion](https://supabase.com/docs/guides/storage/management/delete-objects), [scheduled Edge Functions](https://supabase.com/docs/guides/functions/schedule-functions).
 
@@ -84,11 +92,11 @@ Relevant guidance: [privileged function advisories](https://supabase.com/docs/gu
 - TypeScript build and ESLint pass.
 - 100 unit tests pass, including source-link validation and board ordering.
 - Existing 163 database-access assertions and six multi-connection shopping concurrency checks pass against disposable local Supabase in CI after permission hardening.
-- New `phase5_verification.sql` verifies gallery/transform permissions, same-room references, immutable room identity, metadata edits, cleanup grace period/claims, dry-run non-mutation, deletion failure/retry, attachment rejection after a claim and room/photo cascades.
-- `scripts/verify-visual-storage.mjs` exercises real private Storage HTTP operations against localhost only: uploads, signing, outsider denial, immutable reserved files, protected deletion and worker-RPC denial. It refuses a non-local API URL. Final results pending the expanded CI run.
+- All 25 new `phase5_verification.sql` assertions pass: gallery/transform permissions, same-room references, immutable room identity, metadata edits, cleanup grace period/claims, dry-run non-mutation, deletion failure/retry, attachment rejection after a claim and room/photo cascades.
+- All eight `scripts/verify-visual-storage.mjs` checks pass using real private Storage HTTP operations against localhost only: uploads, signing, outsider denial, immutable reserved files, protected deletion and worker-RPC denial. It refuses a non-local API URL.
 - Browser fixtures cover the room switch, effortless multi-upload, retry idempotency, full-screen viewing and zoom, optional-field conflicts, reordering/removal, transformation creation/comparison/removal and safe source-only ideas. All fixture HTTP/WebSocket traffic to the production Supabase host is intercepted.
 - Initial checks caught and fixed missing editor label associations, a shared trigger referencing a field absent from photo rows, Safari focus restoration, and rapid shopping-filter changes reading stale URL state. The filter fix uses the DOM RouterProvider and synchronous navigation; existing behaviour and URL persistence remain covered by regression tests.
-- Final browser totals and CI identifiers: pending final verification.
+- Browser regression coverage also verifies comparisons referencing photos beyond the first page and closing a viewer when a flatmate removes its last photo. Final browser totals and release CI identifiers are recorded below.
 
 ## Visual evidence
 
