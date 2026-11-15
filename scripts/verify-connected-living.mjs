@@ -117,6 +117,35 @@ pass(seen.cAll.length === 0, 'outsider receives no realtime changes from this fl
 const peek = await C.from('household_events').select('id').eq('household_id', hid)
 pass((peek.data ?? []).length === 0, 'outsider cannot read this flat’s history')
 
+// 4b. Phase 7: essentials, tasks and personal preferences over Realtime.
+const p7 = { bEss: [], bTask: [], bPrefs: [], b2Prefs: [], aPrefs: [], cLiving: [] }
+await Promise.all([
+  listen(B, 'b', 'essentials', `household_id=eq.${hid}`, p7.bEss),
+  listen(B, 'b', 'household_tasks', `household_id=eq.${hid}`, p7.bTask),
+  listen(B2, 'b2', 'user_preferences', `user_id=eq.${blair.id}`, p7.b2Prefs),
+  listen(A, 'a', 'user_preferences', null, p7.aPrefs),
+  listen(C, 'c', 'essentials', null, p7.cLiving),
+  listen(C, 'c', 'household_tasks', null, p7.cLiving),
+])
+const ess = ok(await A.from('essentials').insert({ household_id: hid, name: 'Toilet paper' }).select().single(), 'add essential')
+await waitFor(() => p7.bEss.some((p) => p.new?.id === ess.id), 'essential sync')
+pass(true, 'a new essential appears live for flatmates')
+ok(await B.rpc('update_essential', { p_essential: ess.id, p_action: 'claim', p_expected: 'needed' }), 'claim')
+const lost = await A.rpc('update_essential', { p_essential: ess.id, p_action: 'claim', p_expected: 'needed' })
+pass(lost.error?.code === 'FQ409', 'a second claim from another session is refused')
+await waitFor(() => seen.a.some((p) => p.eventType === 'INSERT' && p.new.reason === 'responsible'), 'claim notice')
+pass(true, 'whoever asked for it is told live that it is being picked up')
+const task = ok(await A.from('household_tasks').insert({ household_id: hid, title: 'Change a lightbulb', assignee_id: blair.id }).select().single(), 'task')
+await waitFor(() => p7.bTask.some((p) => p.new?.id === task.id), 'task sync')
+await waitFor(() => seen.b.some((p) => p.eventType === 'INSERT' && p.new.reason === 'assigned' && p.new.id > notice.id), 'task assignment notice')
+pass(true, 'an assigned task arrives live with a notification for the assignee')
+ok(await B.from('user_preferences').upsert({ accent: 'coral', motion: 'playful' }, { onConflict: 'user_id' }), 'prefs')
+await waitFor(() => p7.b2Prefs.some((p) => p.new?.accent === 'coral'), 'prefs sync')
+pass(true, 'a theme change reaches the same person’s other device')
+await sleep(1000)
+pass(p7.aPrefs.length === 0, 'a flatmate never receives someone else’s preferences')
+pass(p7.cLiving.length === 0, 'outsiders receive no essentials or tasks')
+
 // 5. Removal takes effect immediately, including for the removed person's open session.
 ok(await A.rpc('remove_household_member', { p_household: hid, p_user: blair.id }), 'remove')
 await waitFor(() => seen.bMembers.some((p) => p.old?.user_id === blair.id), 'membership delete event')

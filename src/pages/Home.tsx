@@ -28,14 +28,16 @@ import { nextAction, openItemsFor, progressOf, roomProgress } from '@/lib/stats'
 import { useHousehold } from '@/household/HouseholdProvider'
 
 export function HomePage() {
-  const { me, household, items } = useHousehold()
+  const { me, household, items, rooms } = useHousehold()
   const { prefs, motion: level } = usePreferences()
   const [quickAdd, setQuickAdd] = useState<QuickAddKind | null>(null)
   const [customising, setCustomising] = useState(false)
   const progress = useMemo(() => progressOf(items), [items])
   const firstName = me?.display_name?.split(' ')[0]
   const name = prefs.greetingName || firstName
-  const sections = prefs.layout.filter((s) => !s.hidden)
+  // Sections with nothing to show (no deliveries in transit, no rooms) take no space at all.
+  const inTransit = items.some((i) => !i.is_complete && (i.status === 'ordered' || i.status === 'on_the_way' || i.status === 'ready_to_collect'))
+  const sections = prefs.layout.filter((s) => !s.hidden && (s.id !== 'deliveries' || inTransit) && (s.id !== 'rooms' || rooms.length > 0))
 
   return (
     <>
@@ -77,7 +79,7 @@ export function HomePage() {
                 className="min-w-0"
                 data-section={s.id}
               >
-                <HomeSection id={s.id} onAdd={setQuickAdd} />
+                <HomeSection id={s.id} onAdd={setQuickAdd} focusShown={sections.some((x) => x.id === 'focus')} />
               </motion.div>
             ))}
           </AnimatePresence>
@@ -101,12 +103,12 @@ export function HomePage() {
   )
 }
 
-function HomeSection({ id, onAdd }: { id: HomeSectionId; onAdd: (k: QuickAddKind) => void }) {
+function HomeSection({ id, onAdd, focusShown }: { id: HomeSectionId; onAdd: (k: QuickAddKind) => void; focusShown: boolean }) {
   switch (id) {
     case 'focus':
       return <FocusSection />
     case 'tasks':
-      return <TasksSection onAdd={() => onAdd('task')} />
+      return <TasksSection onAdd={() => onAdd('task')} skipMine={focusShown} />
     case 'essentials':
       return <EssentialsSection onAdd={() => onAdd('essential')} />
     case 'deliveries':
@@ -180,12 +182,15 @@ function FocusSection() {
   )
 }
 
-function TasksSection({ onAdd }: { onAdd: () => void }) {
+/** Household tasks that need attention. Yours are already under "For you" when that's shown. */
+function TasksSection({ onAdd, skipMine }: { onAdd: () => void; skipMine: boolean }) {
+  const { user } = useAuth()
   const { tasks } = useLiving()
   const [open, setOpen] = useState<TaskRow | null>(null)
   const live = tasks.filter((t) => !t.archived_at && t.status !== 'done')
-  const urgent = sortTasks(live.filter((t) => needsAttention(t)))
-  const shown = (urgent.length ? urgent : sortTasks(live)).slice(0, 4)
+  const others = skipMine ? live.filter((t) => t.assignee_id !== user?.id) : live
+  const urgent = sortTasks(others.filter((t) => needsAttention(t)))
+  const shown = (urgent.length ? urgent : sortTasks(others)).slice(0, 4)
   return (
     <section className="mb-9" aria-labelledby="tasks-h">
       <SectionHeader title="Things to do" action={<SeeAll to="/tasks">{live.length ? `All ${live.length}` : 'Open'}</SeeAll>} />
@@ -193,7 +198,7 @@ function TasksSection({ onAdd }: { onAdd: () => void }) {
         Things to do
       </h2>
       {shown.length === 0 ? (
-        <p className="text-ink-2 text-[15px]">Nothing waiting. Nice.</p>
+        <p className="text-ink-2 text-[15px]">{live.length ? 'Nothing else waiting.' : 'Nothing waiting. Nice.'}</p>
       ) : (
         <ul>
           <AnimatePresence initial={false}>

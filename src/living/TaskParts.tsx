@@ -81,7 +81,7 @@ export function TaskItem({ task, onOpen, showRoom = true }: { task: TaskRow; onO
           {meta.length > 0 && (
             <span className="text-ink-2 block truncate text-[14px]">
               {meta.map((m, i) => (
-                <span key={i} className={m === due?.text && due?.tone === 'overdue' ? 'text-danger font-semibold' : m === 'In progress' ? 'text-accent-ink font-semibold' : ''}>
+                <span key={i} className={m === due?.text && due?.tone === 'overdue' ? 'text-danger font-semibold' : m === 'In progress' ? 'text-ink font-semibold' : ''}>
                   {i > 0 ? ' · ' : ''}
                   {m}
                 </span>
