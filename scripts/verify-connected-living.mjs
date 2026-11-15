@@ -14,9 +14,11 @@ const admin = createClient(url, config.SERVICE_ROLE_KEY, { auth: { persistSessio
 let checks = 0
 const pass = (ok, label) => { assert.ok(ok, label); checks++; console.log(`PASS ${label}`) }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-async function waitFor(fn, label, ms = 10_000) {
+let diagnose = async () => {}
+async function waitFor(fn, label, ms = 20_000) {
   const start = Date.now()
   while (Date.now() - start < ms) { if (fn()) return true; await sleep(100) }
+  await diagnose()
   throw new Error(`Timed out: ${label}`)
 }
 
@@ -47,12 +49,20 @@ ok(await C.rpc('create_household', { p_name: 'Other flat', p_address: '' }), 'ou
 
 // Each session listens the way the app does.
 const seen = { a: [], b: [], b2: [], bEvents: [], bMembers: [], cAll: [] }
+// SUBSCRIBED can arrive before Realtime is attached to Postgres changes; wait for its
+// "Subscribed to PostgreSQL" system message so no early change is missed.
 const listen = (client, name, table, filter, sink, event = '*') =>
-  new Promise((resolve) => {
+  new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Realtime never attached for ${name}/${table}`)), 30_000)
     client
       .channel(`${name}-${table}-${randomUUID()}`)
       .on('postgres_changes', { event, schema: 'public', table, ...(filter ? { filter } : {}) }, (p) => sink.push(p))
-      .subscribe((status) => { if (status === 'SUBSCRIBED') resolve() })
+      .on('system', {}, (msg) => {
+        if (msg?.extension === 'postgres_changes') {
+          if (msg.status === 'ok') { clearTimeout(timer); resolve() } else { clearTimeout(timer); reject(new Error(`${name}/${table}: ${msg.message}`)) }
+        }
+      })
+      .subscribe((status, err) => { if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.log(`${name}/${table}: ${status} ${err?.message ?? ''}`) })
   })
 await Promise.all([
   listen(A, 'a', 'notifications', `recipient_id=eq.${avery.id}`, seen.a),
@@ -66,6 +76,12 @@ await Promise.all([
   listen(C, 'c', 'comments', null, seen.cAll),
 ])
 await sleep(500)
+console.log(`Node ${process.version}; all channels attached to Postgres changes`)
+diagnose = async () => {
+  const rows = await B.from('notifications').select('id, reason, read_at').eq('recipient_id', blair.id)
+  console.log('Diagnostics — Blair can read over REST:', JSON.stringify(rows.data ?? rows.error))
+  console.log('Diagnostics — realtime payloads seen:', JSON.stringify({ a: seen.a.length, b: seen.b.length, b2: seen.b2.length, bEvents: seen.bEvents.length, bMembers: seen.bMembers.length, outsider: seen.cAll.length }))
+}
 
 // 1. Assignment reaches the assignee live, never the actor.
 const room = ok(await A.from('rooms').insert({ household_id: hid, name: 'Kitchen' }).select().single(), 'room')

@@ -16,8 +16,8 @@ export function HouseholdActivity() {
       <SectionHeader
         title="Around the flat"
         action={
-          <Link to="/activity" className="text-ink-2 inline-flex min-h-11 items-center gap-0.5 text-[15px] font-semibold">
-            View all activity
+          <Link to="/activity" className="text-ink-2 inline-flex min-h-11 shrink-0 items-center gap-0.5 text-[15px] font-semibold whitespace-nowrap">
+            View all<span className="sr-only"> activity</span>
             <ChevronRight size={16} aria-hidden />
           </Link>
         }

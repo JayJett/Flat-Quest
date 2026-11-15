@@ -247,7 +247,7 @@ function NoticeRow({ notice, onOpen, onMarkRead }: { notice: Notice; onOpen: () 
   const unread = !notice.read_at
   if (!notice.event) return null
   const described = describeEvent(notice.event, look, notice.reason)
-  const actor = notice.event.actor_id ? memberById.get(notice.event.actor_id)?.profile ?? null : null
+  const actor = notice.event.actor_id && notice.event.type !== 'room_completed' ? (memberById.get(notice.event.actor_id)?.profile ?? null) : null
   const Icon = notice.reason === 'mention' ? AtSign : KIND_ICON[described.kind]
   const text = plainText(described.segments)
   return (

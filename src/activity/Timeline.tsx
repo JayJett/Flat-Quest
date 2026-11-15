@@ -173,7 +173,8 @@ export function TimelineRow({ event }: { event: HouseholdEventRow }) {
   const { memberById } = useHousehold()
   const open = useOpenEvent()
   const d = describeEvent(event, look)
-  const actor = event.actor_id ? (memberById.get(event.actor_id)?.profile ?? null) : null
+  // Milestones belong to the flat, not to whoever happened to finish them.
+  const actor = event.actor_id && event.type !== 'room_completed' ? (memberById.get(event.actor_id)?.profile ?? null) : null
   const Icon = ICON[d.kind]
   const body = (
     <>
