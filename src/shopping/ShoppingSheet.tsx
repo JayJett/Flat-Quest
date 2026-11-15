@@ -191,7 +191,7 @@ function ShoppingBody({
             Options{options.length > 0 && <span className="text-ink-2 ml-1.5 text-[16px] font-semibold tabular-nums">{options.length}</span>}
           </h3>
           {options.length > 0 && (
-            <button type="button" onClick={() => setAdding(true)} className="text-accent inline-flex min-h-11 items-center gap-1 text-[15px] font-bold">
+            <button type="button" onClick={() => setAdding(true)} className="text-accent-ink inline-flex min-h-11 items-center gap-1 text-[15px] font-bold">
               <Plus size={18} strokeWidth={2.6} aria-hidden /> Add option
             </button>
           )}
@@ -230,7 +230,7 @@ function ShoppingBody({
           </ul>
         )}
         {item.shopping_url && (
-          <a href={item.shopping_url} target="_blank" rel="noopener noreferrer" className="text-accent mt-2 inline-flex min-h-11 items-center gap-1.5 text-[15px] font-bold">
+          <a href={item.shopping_url} target="_blank" rel="noopener noreferrer" className="text-accent-ink mt-2 inline-flex min-h-11 items-center gap-1.5 text-[15px] font-bold">
             <ExternalLink size={16} aria-hidden /> Saved link: {hostLabel(item.shopping_url) || 'open'}
           </a>
         )}
@@ -449,7 +449,7 @@ function PurchaseSummary({ item, purchase, onEdit }: { item: Item; purchase: Pur
     <motion.section aria-label="Purchase and delivery" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}>
       <div className="mb-1 flex items-center justify-between gap-3">
         <h3 className="text-title font-bold">Purchase</h3>
-        <button type="button" onClick={onEdit} className="text-accent min-h-11 text-[15px] font-bold">
+        <button type="button" onClick={onEdit} className="text-accent-ink min-h-11 text-[15px] font-bold">
           Edit
         </button>
       </div>
@@ -462,7 +462,7 @@ function PurchaseSummary({ item, purchase, onEdit }: { item: Item; purchase: Pur
         ))}
       </dl>
       {purchase?.tracking_url && (
-        <a href={purchase.tracking_url} target="_blank" rel="noopener noreferrer" className="text-accent inline-flex min-h-11 items-center gap-1.5 text-[15px] font-bold">
+        <a href={purchase.tracking_url} target="_blank" rel="noopener noreferrer" className="text-accent-ink inline-flex min-h-11 items-center gap-1.5 text-[15px] font-bold">
           <ExternalLink size={16} aria-hidden /> Track the delivery
         </a>
       )}

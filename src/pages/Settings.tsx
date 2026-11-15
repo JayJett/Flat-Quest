@@ -9,6 +9,7 @@ import { Button, Field } from '@/components/ui'
 import { checklistFromCsv, type ImportRow } from '@/lib/csv'
 import { bundledChecklist, runImport } from '@/household/importChecklist'
 import { useHousehold } from '@/household/HouseholdProvider'
+import { MakeItYours } from '@/personal/MakeItYours'
 
 export function SettingsPage() {
   const { user, signOut } = useAuth()
@@ -70,6 +71,10 @@ export function SettingsPage() {
       <PageHeader title="Settings" hideTitleUntilScroll />
       <div className="px-4 lg:max-w-xl lg:px-0">
         <h1 className="text-display pt-2 pb-6 font-extrabold">Settings</h1>
+
+        <MakeItYours />
+
+        <hr className="border-line my-8" />
 
         <section aria-labelledby="flat-h">
           <h2 id="flat-h" className="text-title mb-4 font-bold">

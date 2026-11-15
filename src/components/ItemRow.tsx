@@ -9,7 +9,7 @@ import { useToast } from './Toast'
 
 export const STATUS_TONE: Record<Status, string> = {
   to_decide: 'text-ink-2',
-  bringing: 'text-accent',
+  bringing: 'text-accent-ink',
   need_to_buy: 'text-orange-ink',
   shopping: 'text-periwinkle-ink',
   ordered: 'text-green-ink',
@@ -121,7 +121,7 @@ export function ItemRow({ item, onOpen, roomName }: ItemRowProps) {
           <button
             type="button"
             onClick={claim}
-            className="pressable text-accent active:bg-accent-soft -mr-1 min-h-11 rounded-xl px-3 text-[15px] font-bold"
+            className="pressable text-accent-ink active:bg-accent-soft -mr-1 min-h-11 rounded-xl px-3 text-[15px] font-bold"
             aria-label={`Claim ${item.name}`}
           >
             Claim

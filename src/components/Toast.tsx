@@ -3,14 +3,17 @@ import { AnimatePresence, motion } from 'motion/react'
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
 
 type Tone = 'success' | 'error' | 'info'
+type ToastAction = { label: string; run: () => void }
 interface Toast {
   id: number
   tone: Tone
   message: string
+  action?: ToastAction
 }
 
 interface ToastApi {
-  show: (message: string, tone?: Tone) => void
+  /** An optional action (e.g. Undo) keeps the toast up a little longer. */
+  show: (message: string, tone?: Tone, action?: ToastAction) => void
   error: (message: string) => void
   success: (message: string) => void
 }
@@ -21,10 +24,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
   const nextId = useRef(1)
 
-  const show = useCallback((message: string, tone: Tone = 'info') => {
+  const show = useCallback((message: string, tone: Tone = 'info', action?: ToastAction) => {
     const id = nextId.current++
-    setToasts((t) => [...t.filter((x) => x.message !== message), { id, tone, message }].slice(-3))
-    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), tone === 'error' ? 5000 : 2800)
+    setToasts((t) => [...t.filter((x) => x.message !== message), { id, tone, message, action }].slice(-3))
+    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), action ? 6000 : tone === 'error' ? 5000 : 2800)
   }, [])
 
   const api = useMemo<ToastApi>(
@@ -58,6 +61,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 <CircleCheck size={18} className="text-green shrink-0" aria-hidden />
               ) : null}
               <span>{t.message}</span>
+              {t.action && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setToasts((all) => all.filter((x) => x.id !== t.id))
+                    t.action!.run()
+                  }}
+                  className="pressable -my-1 -mr-1 ml-1 min-h-10 rounded-xl px-3 font-bold text-white underline-offset-2 hover:underline"
+                >
+                  {t.action.label}
+                </button>
+              )}
             </motion.div>
           ))}
         </AnimatePresence>

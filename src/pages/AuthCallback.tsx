@@ -67,7 +67,7 @@ export function ResetPasswordPage() {
       <AuthLayout>
         <h1 className="text-display font-bold">Link expired</h1>
         <p className="text-ink-2 mt-3">Request a new password reset link from the sign-in screen.</p>
-        <Link to="/sign-in" className="text-accent mt-6 font-bold">
+        <Link to="/sign-in" className="text-accent-ink mt-6 font-bold">
           Back to sign in
         </Link>
       </AuthLayout>

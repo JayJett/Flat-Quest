@@ -93,7 +93,10 @@ test('retry after a partial create does not create a duplicate item', async ({ p
   const state = await mockFlat(page)
   state.failAssign = true
   await page.goto('./')
-  await page.getByRole('button', { name: 'Add an item' }).click()
+  // Phase 7: Home's + is "Quick add" (essential, task or furnishing item).
+  await page.getByRole('button', { name: 'Quick add' }).click()
+  await page.getByRole('radio', { name: 'Furnishing' }).click()
+  await page.getByRole('button', { name: 'Add a furnishing item' }).click()
   await page.getByLabel('Item', { exact: true }).fill('Coffee table')
   await page.getByRole('checkbox', { name: 'Me', exact: true }).click()
   await page.getByRole('button', { name: 'Add item', exact: true }).click()

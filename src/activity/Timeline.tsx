@@ -1,4 +1,4 @@
-import { Bell, Check, Gift, Images, MessageCircle, PackageCheck, ShoppingBag, Sparkles, Truck, UserRound, Users, type LucideIcon } from 'lucide-react'
+import { ListTodo, ShoppingBasket, Bell, Check, Gift, Images, MessageCircle, PackageCheck, ShoppingBag, Sparkles, Truck, UserRound, Users, type LucideIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { Avatar } from '@/components/Avatar'
@@ -23,6 +23,8 @@ const ICON: Record<EventKind, LucideIcon> = {
   comment: MessageCircle,
   member: Users,
   history: Bell,
+  essential: ShoppingBasket,
+  task: ListTodo,
 }
 
 /**

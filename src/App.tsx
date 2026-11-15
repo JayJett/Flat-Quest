@@ -11,6 +11,10 @@ import { ToastProvider } from '@/components/Toast'
 import { UserScopedHouseholdProvider } from '@/household/HouseholdProvider'
 import { BASE_PATH } from '@/lib/urls'
 
+import { UserScopedPreferencesProvider } from '@/personal/PreferencesProvider'
+import { CelebrationProvider } from '@/motion/Celebration'
+const EssentialsPage = lazy(() => import('@/pages/Essentials').then((m) => ({ default: m.EssentialsPage })))
+const TasksPage = lazy(() => import('@/pages/Tasks').then((m) => ({ default: m.TasksPage })))
 const ActivityPage = lazy(() => import('@/pages/Activity').then((m) => ({ default: m.ActivityPage })))
 const AuthCallbackPage = lazy(() => import('@/pages/AuthCallback').then((m) => ({ default: m.AuthCallbackPage })))
 const ResetPasswordPage = lazy(() => import('@/pages/AuthCallback').then((m) => ({ default: m.ResetPasswordPage })))
@@ -33,9 +37,13 @@ function Providers() {
     <MotionConfig reducedMotion="user">
       <ToastProvider>
         <AuthProvider>
-          <UserScopedHouseholdProvider>
-            <Outlet />
-          </UserScopedHouseholdProvider>
+          <UserScopedPreferencesProvider>
+            <CelebrationProvider>
+              <UserScopedHouseholdProvider>
+                <Outlet />
+              </UserScopedHouseholdProvider>
+            </CelebrationProvider>
+          </UserScopedPreferencesProvider>
         </AuthProvider>
       </ToastProvider>
     </MotionConfig>
@@ -72,6 +80,8 @@ const router = createBrowserRouter([
           { path: 'profile', element: <ProfilePage /> },
           { path: 'settings', element: <SettingsPage /> },
           { path: 'activity', element: <ActivityPage /> },
+          { path: 'essentials', element: <EssentialsPage /> },
+          { path: 'tasks', element: <TasksPage /> },
         ],
       },
       { path: '*', element: <Navigate to="/" replace /> },

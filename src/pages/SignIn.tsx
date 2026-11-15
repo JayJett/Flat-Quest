@@ -118,7 +118,7 @@ export function SignInPage() {
   if (sentTo) {
     return (
       <AuthLayout>
-        <div className="bg-accent-soft text-accent mb-6 flex h-16 w-16 items-center justify-center rounded-[22px]">
+        <div className="bg-accent-soft text-accent-ink mb-6 flex h-16 w-16 items-center justify-center rounded-[22px]">
           <Mail size={30} aria-hidden />
         </div>
         <h1 className="text-display font-bold">Check your email</h1>
@@ -231,7 +231,7 @@ export function SignInPage() {
             </button>
             <p className="text-ink-2">
               New here?{' '}
-              <button className="text-accent min-h-11 font-bold" onClick={() => { setMode('sign-up'); setError(null) }}>
+              <button className="text-accent-ink min-h-11 font-bold" onClick={() => { setMode('sign-up'); setError(null) }}>
                 Create an account
               </button>
             </p>
@@ -240,7 +240,7 @@ export function SignInPage() {
         {mode !== 'sign-in' && (
           <p className="text-ink-2">
             Already have an account?{' '}
-            <button className="text-accent min-h-11 font-bold" onClick={() => { setMode('sign-in'); setError(null) }}>
+            <button className="text-accent-ink min-h-11 font-bold" onClick={() => { setMode('sign-in'); setError(null) }}>
               Sign in
             </button>
           </p>

@@ -213,6 +213,9 @@ export type HouseholdEventRow = {
   comment_id: string | null
   transformation_id: string | null
   subject_id: string | null
+  /** Phase 7 */
+  essential_id?: string | null
+  task_id?: string | null
   data: Json
   in_timeline: boolean
   created_at: string
@@ -245,6 +248,68 @@ export type CommentRow = {
   deleted_at: string | null
 }
 
+/** Phase 7: consumables that run out and get re-bought (separate from furnishing items). */
+export type EssentialStatus = 'needed' | 'getting' | 'stocked'
+export type EssentialRow = {
+  id: string
+  household_id: string
+  name: string
+  name_key: string
+  category: 'kitchen' | 'bathroom' | 'laundry' | 'cleaning' | 'other' | null
+  note: string | null
+  status: EssentialStatus
+  claimed_by: string | null
+  needed_at: string | null
+  needed_by: string | null
+  restocked_at: string | null
+  restocked_by: string | null
+  archived_at: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type EssentialRestockRow = {
+  id: number
+  essential_id: string
+  household_id: string
+  restocked_by: string | null
+  restocked_by_name: string | null
+  needed_at: string | null
+  restocked_at: string
+  prior_status: string
+  prior_claimed_by: string | null
+  prior_needed_by: string | null
+}
+
+export type TaskStatus = 'todo' | 'doing' | 'done'
+export type TaskRow = {
+  id: string
+  household_id: string
+  title: string
+  notes: string | null
+  room_id: string | null
+  assignee_id: string | null
+  /** Calendar date YYYY-MM-DD. */
+  due_on: string | null
+  status: TaskStatus
+  completed_at: string | null
+  completed_by: string | null
+  archived_at: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type UserPreferencesRow = {
+  user_id: string
+  accent: 'blue' | 'lavender' | 'mint' | 'coral' | 'sunshine'
+  greeting_name: string | null
+  motion: 'playful' | 'balanced' | 'minimal'
+  home_layout: Json
+  updated_at: string
+}
+
 export type Database = {
   __InternalSupabase: { PostgrestVersion: '14.18' }
   public: {
@@ -267,6 +332,10 @@ export type Database = {
       household_events: Table<HouseholdEventRow, 'household_id' | 'type'>
       notifications: Table<NotificationRow, 'event_id' | 'household_id' | 'recipient_id' | 'reason' | 'category'>
       comments: Table<CommentRow, 'household_id' | 'body'>
+      essentials: Table<EssentialRow, 'household_id' | 'name'>
+      essential_restocks: Table<EssentialRestockRow, 'essential_id' | 'household_id' | 'prior_status'>
+      household_tasks: Table<TaskRow, 'household_id' | 'title'>
+      user_preferences: Table<UserPreferencesRow, never>
     }
     Views: { [_ in never]: never }
     Functions: {
@@ -295,6 +364,10 @@ export type Database = {
       }
       revoke_household_invite: { Args: { p_invite: string }; Returns: undefined }
       mark_all_notifications_read: { Args: { p_household: string }; Returns: number }
+      update_essential: {
+        Args: { p_essential: string; p_action: string; p_expected?: string | null; p_to?: string | null }
+        Returns: EssentialRow
+      }
       leave_household: { Args: { p_household: string }; Returns: Json }
       remove_household_member: { Args: { p_household: string; p_user: string }; Returns: Json }
       transfer_household_ownership: { Args: { p_household: string; p_user: string }; Returns: undefined }

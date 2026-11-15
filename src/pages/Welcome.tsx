@@ -91,7 +91,7 @@ export function WelcomePage() {
           <div className="mt-10 flex flex-col gap-3">
             <button
               onClick={() => setStep('create')}
-              className="pressable bg-accent flex min-h-[88px] items-center justify-between gap-4 rounded-[var(--radius-card)] px-5 text-left text-white"
+              className="pressable bg-accent flex min-h-[88px] items-center justify-between gap-4 rounded-[var(--radius-card)] px-5 text-left text-on-accent"
             >
               <span>
                 <span className="block text-[18px] font-bold">Set up our flat</span>

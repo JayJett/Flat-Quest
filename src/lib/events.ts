@@ -20,6 +20,8 @@ export type EventKind =
   | 'comment'
   | 'member'
   | 'history'
+  | 'essential'
+  | 'task'
 
 export interface EventLookup {
   /** Current name for a member (falls back to the name stored with the event). */
@@ -48,7 +50,11 @@ const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null)
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 
 /** Where an event leads. Item-level events open the item; discussions open its discussion. */
-export function eventHref(e: Pick<HouseholdEventRow, 'type' | 'room_id' | 'item_id' | 'option_id' | 'idea_id' | 'comment_id'>): string | null {
+export function eventHref(
+  e: Pick<HouseholdEventRow, 'type' | 'room_id' | 'item_id' | 'option_id' | 'idea_id' | 'comment_id'> & Partial<Pick<HouseholdEventRow, 'essential_id' | 'task_id'>>,
+): string | null {
+  if (e.type.startsWith('essential_')) return e.essential_id ? `/essentials?essential=${e.essential_id}` : '/essentials'
+  if (e.type.startsWith('task_')) return e.task_id ? `/tasks?task=${e.task_id}` : '/tasks'
   switch (e.type) {
     case 'history_started':
     case 'member_limit_changed':
@@ -111,6 +117,26 @@ export function describeEvent(e: HouseholdEventRow, look: EventLookup, reason?: 
   switch (e.type) {
     case 'history_started':
       return out('history', t('Flat history starts here'))
+    case 'essential_needed':
+      return count > 1
+        ? out('essential', A, t(` added ${count} things to Essentials`))
+        : out('essential', A, t(' says we need '), { text: str(d.essential) ?? 'something', strong: true })
+    case 'essential_claimed':
+      return out('essential', A, t(reason ? ' is getting the ' : ' is getting '), { text: str(d.essential) ?? 'it', strong: true }, t(reason ? ' you asked for' : ''))
+    case 'essential_handover':
+      return out('essential', A, t(' asked you to pick up '), { text: str(d.essential) ?? 'something', strong: true })
+    case 'essential_takeover':
+      return out('essential', A, t(' is getting '), { text: str(d.essential) ?? 'it', strong: true }, t(' instead of you'))
+    case 'essential_restocked':
+      return out('essential', A, t(' restocked '), { text: str(d.essential) ?? 'something', strong: true }, t(reason ? ' — no need to buy it' : ''))
+    case 'task_added':
+      return out('task', A, t(' added a task: '), { text: str(d.task) ?? 'a task', strong: true })
+    case 'task_assigned':
+      return out('task', A, t(' asked you to '), { text: lowerFirst(str(d.task) ?? 'do a task'), strong: true })
+    case 'task_unassigned':
+      return out('task', A, t(' took you off '), { text: str(d.task) ?? 'a task', strong: true })
+    case 'task_completed':
+      return out('task', A, t(' finished '), { text: str(d.task) ?? 'a task', strong: true })
     case 'item_added':
       return count > 1 ? out('item', A, t(` added ${count} items to `), R) : out('item', A, t(' added '), I, t(' to '), R)
     case 'item_completed':
@@ -160,6 +186,11 @@ export function describeEvent(e: HouseholdEventRow, look: EventLookup, reason?: 
     default:
       return out('history', A, t(' made a change'))
   }
+}
+
+/** "Assemble the TV cabinet" → "assemble the TV cabinet" (keeps acronyms like "TV"). */
+function lowerFirst(s: string): string {
+  return /^[A-Z][a-z]/.test(s) ? s.charAt(0).toLowerCase() + s.slice(1) : s
 }
 
 export const plainText = (segments: Segment[]) => segments.map((s) => s.text).join('')

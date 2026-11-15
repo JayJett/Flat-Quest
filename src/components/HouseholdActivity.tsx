@@ -12,7 +12,7 @@ export function HouseholdActivity() {
   const real = events.filter((e) => e.type !== 'history_started').slice(0, PREVIEW)
   const start = events.find((e) => e.type === 'history_started')
   return (
-    <section className="mt-9" aria-label="Around the flat">
+    <section aria-label="Around the flat">
       <SectionHeader
         title="Around the flat"
         action={

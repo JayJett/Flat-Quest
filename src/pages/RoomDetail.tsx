@@ -237,7 +237,7 @@ export function RoomDetailPage() {
             )}
             <button
               onClick={() => setAdding(true)}
-              className="pressable text-accent active:bg-accent-soft -mx-2 mt-3 flex min-h-14 w-[calc(100%+16px)] items-center gap-3 rounded-2xl px-2 font-bold"
+              className="pressable text-accent-ink active:bg-accent-soft -mx-2 mt-3 flex min-h-14 w-[calc(100%+16px)] items-center gap-3 rounded-2xl px-2 font-bold"
             >
               <span className="bg-accent-soft flex h-[30px] w-[30px] items-center justify-center rounded-full">
                 <Plus size={18} strokeWidth={2.6} aria-hidden />

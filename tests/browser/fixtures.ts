@@ -24,6 +24,24 @@ export interface EventRow extends Row { id: number; type: string; actor_id: stri
 export interface NoticeRow extends Row { id: number; event_id: number; recipient_id: string; reason: string; category: string; read_at: string | null; created_at: string }
 export interface CommentFixture extends Row { id: string; item_id: string | null; option_id: string | null; idea_id: string | null; parent_id: string | null; author_id: string | null; body: string; mentions: string[]; deleted_at: string | null; edited_at: string | null; created_at: string }
 
+export interface EssentialFixture extends Row { id: string; name: string; status: 'needed' | 'getting' | 'stocked'; claimed_by: string | null; archived_at: string | null; updated_at: string }
+export interface TaskFixture extends Row { id: string; title: string; status: 'todo' | 'doing' | 'done'; assignee_id: string | null; due_on: string | null; archived_at: string | null; updated_at: string; completed_at: string | null }
+
+export function makeEssential(patch: Partial<EssentialFixture> & { name: string }): EssentialFixture {
+  const at = stamp()
+  return {
+    id: `e5e5e5e5-e5e5-4e5e-8e5e-${String(++tick).padStart(12, '0')}`, household_id: hid, name_key: patch.name.toLowerCase(), category: null, note: null, status: 'needed',
+    claimed_by: null, needed_at: at, needed_by: uid, restocked_at: null, restocked_by: null, archived_at: null, created_by: uid, created_at: at, updated_at: at, ...patch,
+  }
+}
+export function makeTask(patch: Partial<TaskFixture> & { title: string }): TaskFixture {
+  const at = stamp()
+  return {
+    id: `7a7a7a7a-7a7a-47a7-87a7-${String(++tick).padStart(12, '0')}`, household_id: hid, notes: null, room_id: null, assignee_id: null, due_on: null, status: 'todo',
+    completed_at: null, completed_by: null, archived_at: null, created_by: uid, created_at: at, updated_at: at, ...patch,
+  }
+}
+
 let tick = 0
 /** Strictly increasing timestamps, so "has this changed?" checks behave like the database. */
 const stamp = () => new Date(Date.parse('2026-11-11T02:00:00.000Z') + ++tick * 1000).toISOString()
@@ -54,6 +72,10 @@ export async function mockFlat(page: Page, tour = false, opts: { flatmates?: boo
     events: [{ id: 1, household_id: hid, type: 'history_started', actor_id: null, actor_name: null, room_id: null, item_id: null, option_id: null, idea_id: null, comment_id: null, transformation_id: null, subject_id: null, data: {}, in_timeline: true, created_at: '2026-11-10T00:00:00.000Z' }] as EventRow[],
     notifications: [] as NoticeRow[], comments: [] as CommentFixture[],
     failComment: false, failMarkRead: false, rpcCalls: [] as { name: string; body: Row }[], memberLimit: 4,
+    // Phase 7
+    essentials: [] as EssentialFixture[], restocks: [] as Row[], tasks: [] as TaskFixture[],
+    prefs: null as null | { accent: string; greeting_name: string | null; motion: string; home_layout: unknown },
+    failEssential: false, failTask: false, failPrefs: false, essentialCalls: [] as Row[],
   }
   const user = { id: uid, aud: 'authenticated', role: 'authenticated', email: 'alex@example.invalid', app_metadata: {}, user_metadata: {}, created_at: now }
   await page.addInitScript(({ user }) => {
@@ -347,6 +369,78 @@ export async function mockFlat(page: Page, tour = false, opts: { flatmates?: boo
       if (table === 'set_member_limit') { state.memberLimit = body.p_limit; return send(null) }
       if (table === 'leave_household') return dbError('42501', 'Hand ownership to a flatmate before you leave', 403)
       return send(table === 'transfer_household_ownership' ? null : { assigned: 3, sole: 1, coordinating: 0 })
+    }
+
+    // ---- Phase 7: essentials, tasks and personal preferences (mirroring the database rules).
+    if (table === 'user_preferences') {
+      if (method === 'GET') return rows(state.prefs ? [{ user_id: uid, updated_at: now, ...state.prefs }] : [])
+      if (state.failPrefs) return send({ message: 'Preferences unavailable' }, 500)
+      state.prefs = { accent: 'blue', greeting_name: null, motion: 'balanced', home_layout: [], ...(state.prefs ?? {}), ...body }
+      return rows([{ user_id: uid, updated_at: stamp(), ...state.prefs }])
+    }
+    if (table === 'essentials') {
+      if (method === 'GET') return rows(state.essentials)
+      if (state.failEssential) return send({ message: 'Essentials unavailable' }, 500)
+      if (method === 'POST') {
+        if (body.claimed_by || body.created_by) return dbError('42501', 'permission denied for table essentials', 403)
+        const key = String(body.name).trim().toLowerCase().replace(/\s+/g, ' ')
+        if (state.essentials.some((e) => !e.archived_at && String(e.name).toLowerCase() === key)) return dbError('23505', 'duplicate key value violates unique constraint "essentials_one_per_name"', 409)
+        const row = makeEssential({ ...body, name: String(body.name).trim(), status: body.status === 'stocked' ? 'stocked' : 'needed' })
+        state.essentials.push(row)
+        return rows([row])
+      }
+      const row = state.essentials.find((e) => e.id === q('id'))
+      if (method === 'PATCH' && row) {
+        Object.assign(row, body, { updated_at: stamp() })
+        if (body.archived_at) Object.assign(row, { status: 'stocked', claimed_by: null })
+        return rows([row])
+      }
+      return rows([])
+    }
+    if (table === 'essential_restocks') return rows(state.restocks.filter((r) => r.essential_id === q('essential_id')).reverse())
+    if (table === 'update_essential') {
+      state.essentialCalls.push(body)
+      if (state.failEssential) return send({ message: 'Essentials unavailable' }, 500)
+      const e = state.essentials.find((x) => x.id === body.p_essential)
+      if (!e) return dbError('P0002', 'That essential is no longer on the list', 404)
+      const a = body.p_action
+      if (a === 'claim') {
+        if (e.status === 'getting' && e.claimed_by !== uid) return dbError('FQ409', `Madi is already getting ${e.name}`)
+        if (e.status === 'needed') Object.assign(e, { status: 'getting', claimed_by: uid })
+      } else if (a === 'release' && e.claimed_by === uid) Object.assign(e, { status: 'needed', claimed_by: null })
+      else if (a === 'takeover') Object.assign(e, { status: 'getting', claimed_by: uid })
+      else if (a === 'handover') Object.assign(e, { claimed_by: body.p_to })
+      else if (a === 'restock' && e.status !== 'stocked') {
+        state.restocks.push({ id: state.restocks.length + 1, essential_id: e.id, household_id: hid, restocked_by: uid, restocked_by_name: 'Alex', restocked_at: stamp(), prior_status: e.status, prior_claimed_by: e.claimed_by })
+        Object.assign(e, { status: 'stocked', claimed_by: null, restocked_at: stamp(), restocked_by: uid })
+      } else if (a === 'undo_restock') {
+        const last = [...state.restocks].reverse().find((r) => r.essential_id === e.id)
+        if (!last) return dbError('FQ409', 'That restock can no longer be undone')
+        state.restocks = state.restocks.filter((r) => r !== last)
+        Object.assign(e, { status: last.prior_status, claimed_by: last.prior_claimed_by })
+      } else if (a === 'need' && (e.status === 'stocked' || e.archived_at)) Object.assign(e, { status: 'needed', claimed_by: null, archived_at: null, needed_by: uid })
+      e.updated_at = stamp()
+      return send(e)
+    }
+    if (table === 'household_tasks') {
+      if (method === 'GET') return rows(state.tasks)
+      if (state.failTask) return send({ message: 'Tasks unavailable' }, 500)
+      if (method === 'POST') {
+        if (body.completed_by || body.created_by) return dbError('42501', 'permission denied for table household_tasks', 403)
+        const row = makeTask({ ...body, title: String(body.title).trim() })
+        state.tasks.push(row)
+        return rows([row])
+      }
+      const row = state.tasks.find((t) => t.id === q('id') && (!q('updated_at') || t.updated_at === q('updated_at')))
+      if (method === 'PATCH') {
+        if (!row) return rows([])
+        const was = row.status
+        Object.assign(row, body, { updated_at: stamp() })
+        if (row.status === 'done' && was !== 'done') row.completed_at = new Date().toISOString()
+        if (row.status !== 'done') row.completed_at = null
+        return rows([row])
+      }
+      return rows([])
     }
 
     if (table === 'wishlist_items') return send([{ id: 'idea', household_id: hid, title: 'A reading lamp', created_by: uid, created_at: now, updated_at: now, import_key: null, voters: [], room_id: rid, notes: null, photo_path: null, estimated_price: null, shopping_url: null, is_chosen: false, chosen_at: null, chosen_by: null, checklist_item_id: null }])
