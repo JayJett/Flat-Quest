@@ -4,6 +4,7 @@ import { useAuth } from '@/auth/AuthProvider'
 import { Avatar } from '@/components/Avatar'
 import { RoomSheet } from '@/components/RoomSheet'
 import { ConfirmSheet, Sheet } from '@/components/Sheet'
+import { Discussion } from '@/discussion/Discussion'
 import { useToast } from '@/components/Toast'
 import { Button, Field, Spinner } from '@/components/ui'
 import { useHousehold } from '@/household/HouseholdProvider'
@@ -38,16 +39,40 @@ function suggestedBy(option: ProductOption, memberById: Map<string, Member>, myI
 }
 
 // ---------------------------------------------------------------- option details
-export function OptionSheet({ open, optionId, item, onClose }: { open: boolean; optionId: string | null; item: Item; onClose: () => void }) {
+export function OptionSheet({
+  open,
+  optionId,
+  item,
+  onClose,
+  focusCommentId,
+}: {
+  open: boolean
+  optionId: string | null
+  item: Item
+  onClose: () => void
+  focusCommentId?: string | null
+}) {
   const [busy, setBusy] = useState(false)
   return (
     <Sheet open={open} onClose={onClose} title="Option" busy={busy}>
-      {open && optionId && <OptionDetails key={optionId} optionId={optionId} item={item} onClose={onClose} onBusy={setBusy} />}
+      {open && optionId && <OptionDetails key={optionId} optionId={optionId} item={item} onClose={onClose} onBusy={setBusy} focusCommentId={focusCommentId} />}
     </Sheet>
   )
 }
 
-function OptionDetails({ optionId, item, onClose, onBusy }: { optionId: string; item: Item; onClose: () => void; onBusy: (b: boolean) => void }) {
+function OptionDetails({
+  optionId,
+  item,
+  onClose,
+  onBusy,
+  focusCommentId,
+}: {
+  optionId: string
+  item: Item
+  onClose: () => void
+  onBusy: (b: boolean) => void
+  focusCommentId?: string | null
+}) {
   const { user } = useAuth()
   const { rooms, memberById } = useHousehold()
   const { optionById, preferencesByItem, setPreference, chooseOption, deleteOption } = useShopping()
@@ -202,7 +227,9 @@ function OptionDetails({ optionId, item, onClose, onBusy }: { optionId: string; 
         </Button>
       )}
 
-      <div className="-mt-2 grid grid-cols-2 gap-2">
+      <Discussion target={{ option_id: option.id }} focusCommentId={focusCommentId} />
+
+      <div className="grid grid-cols-2 gap-2">
         <Button type="button" variant="ghost" icon={<Pencil size={18} aria-hidden />} onClick={() => setEditing(true)}>
           Edit
         </Button>

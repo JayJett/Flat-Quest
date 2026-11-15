@@ -199,6 +199,52 @@ export type InviteSummary = {
   spaces_left: number
 }
 
+/** Phase 6: one durable record per meaningful change (timeline + notification source). */
+export type HouseholdEventRow = {
+  id: number
+  household_id: string
+  type: string
+  actor_id: string | null
+  actor_name: string | null
+  room_id: string | null
+  item_id: string | null
+  option_id: string | null
+  idea_id: string | null
+  comment_id: string | null
+  transformation_id: string | null
+  subject_id: string | null
+  data: Json
+  in_timeline: boolean
+  created_at: string
+}
+
+export type NotificationRow = {
+  id: number
+  event_id: number
+  household_id: string
+  recipient_id: string
+  reason: string
+  category: 'personal' | 'household'
+  read_at: string | null
+  created_at: string
+}
+
+export type CommentRow = {
+  id: string
+  household_id: string
+  item_id: string | null
+  option_id: string | null
+  idea_id: string | null
+  parent_id: string | null
+  author_id: string | null
+  author_name: string | null
+  body: string
+  mentions: string[]
+  created_at: string
+  edited_at: string | null
+  deleted_at: string | null
+}
+
 export type Database = {
   __InternalSupabase: { PostgrestVersion: '14.18' }
   public: {
@@ -218,6 +264,9 @@ export type Database = {
       product_preferences: Table<ProductPreferenceRow, 'item_id' | 'household_id' | 'option_id'>
       purchase_coordinators: Table<PurchaseCoordinatorRow, 'item_id' | 'household_id'>
       item_purchases: Table<ItemPurchaseRow, 'item_id' | 'household_id'>
+      household_events: Table<HouseholdEventRow, 'household_id' | 'type'>
+      notifications: Table<NotificationRow, 'event_id' | 'household_id' | 'recipient_id' | 'reason' | 'category'>
+      comments: Table<CommentRow, 'household_id' | 'body'>
     }
     Views: { [_ in never]: never }
     Functions: {
@@ -245,6 +294,12 @@ export type Database = {
         Returns: { ideas_created: number; ideas_skipped: number }[]
       }
       revoke_household_invite: { Args: { p_invite: string }; Returns: undefined }
+      mark_all_notifications_read: { Args: { p_household: string }; Returns: number }
+      leave_household: { Args: { p_household: string }; Returns: Json }
+      remove_household_member: { Args: { p_household: string; p_user: string }; Returns: Json }
+      transfer_household_ownership: { Args: { p_household: string; p_user: string }; Returns: undefined }
+      set_member_limit: { Args: { p_household: string; p_limit: number }; Returns: undefined }
+      member_departure_summary: { Args: { p_household: string; p_user: string }; Returns: Json }
       save_item_purchase: {
         Args: {
           p_item: string

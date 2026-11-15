@@ -72,6 +72,11 @@ jobs:
         run: |
           supabase status -o json > "$RUNNER_TEMP/local-supabase.json"
           node scripts/verify-visual-storage.mjs "$RUNNER_TEMP/local-supabase.json"
+      - name: Live notifications with independent sessions (Realtime)
+        run: |
+          npm ci --no-audit --no-fund
+          supabase status -o json > "$RUNNER_TEMP/local-supabase.json"
+          node scripts/verify-connected-living.mjs "$RUNNER_TEMP/local-supabase.json"
       - name: Stop local Supabase
         if: always()
         run: supabase stop --no-backup

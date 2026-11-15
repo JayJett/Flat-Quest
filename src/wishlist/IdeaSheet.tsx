@@ -5,6 +5,7 @@ import { useAuth } from '@/auth/AuthProvider'
 import { Avatar, useSignedUrl } from '@/components/Avatar'
 import { Switch } from '@/components/ItemSheet'
 import { ConfirmSheet, Sheet } from '@/components/Sheet'
+import { Discussion } from '@/discussion/Discussion'
 import { useToast } from '@/components/Toast'
 import { Button, Field } from '@/components/ui'
 import { prepareImage, validateAvatarFile } from '@/lib/image'
@@ -31,15 +32,15 @@ function normaliseUrl(v: string): string | null | 'invalid' {
   }
 }
 
-export function IdeaSheet({ open, idea, onClose }: { open: boolean; idea: Idea | null; onClose: () => void }) {
+export function IdeaSheet({ open, idea, onClose, focusCommentId }: { open: boolean; idea: Idea | null; onClose: () => void; focusCommentId?: string | null }) {
   return (
     <Sheet open={open} onClose={onClose} title={idea ? 'Idea' : 'Add an idea'}>
-      {open && <IdeaForm key={idea?.id ?? 'new'} ideaId={idea?.id ?? null} onDone={onClose} />}
+      {open && <IdeaForm key={idea?.id ?? 'new'} ideaId={idea?.id ?? null} onDone={onClose} focusCommentId={focusCommentId} />}
     </Sheet>
   )
 }
 
-function IdeaForm({ ideaId, onDone }: { ideaId: string | null; onDone: () => void }) {
+function IdeaForm({ ideaId, onDone, focusCommentId }: { ideaId: string | null; onDone: () => void; focusCommentId?: string | null }) {
   const { user } = useAuth()
   const { rooms, memberById } = useHousehold()
   const { ideas, addIdea, updateIdea, deleteIdea, addToChecklist, uploadPhoto, removeFile } = useWishlist()
@@ -285,6 +286,8 @@ function IdeaForm({ ideaId, onDone }: { ideaId: string | null; onDone: () => voi
           </section>
         </>
       )}
+
+      {idea && <Discussion target={{ idea_id: idea.id }} focusCommentId={focusCommentId} />}
 
       <div className="bg-surface border-line sticky -bottom-4 z-10 -mx-5 flex flex-col gap-1 border-t px-5 pt-3 pb-4">
         <Button type="submit" size="lg" block loading={saving}>

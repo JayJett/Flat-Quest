@@ -16,6 +16,7 @@ import {
 import { useHousehold, type ItemPatch } from '@/household/HouseholdProvider'
 import { optionsLine } from '@/lib/shopping'
 import { ShoppingSheet } from '@/shopping/ShoppingSheet'
+import { Discussion } from '@/discussion/Discussion'
 import { useShopping } from '@/shopping/ShoppingProvider'
 import { Avatar } from './Avatar'
 import { assigneeMembers, responsibilityLabel } from './ItemRow'
@@ -32,6 +33,8 @@ interface ItemSheetProps {
   roomId?: string
   /** Set when this sheet was opened from the shopping sheet, which already shows all of that. */
   hideShoppingLink?: boolean
+  /** Opened from a notification: scroll this comment into view. */
+  focusCommentId?: string | null
 }
 
 interface Draft {
@@ -89,16 +92,16 @@ function normaliseUrl(v: string): string | null | 'invalid' {
   }
 }
 
-export function ItemSheet({ open, onClose, item, roomId, hideShoppingLink }: ItemSheetProps) {
+export function ItemSheet({ open, onClose, item, roomId, hideShoppingLink, focusCommentId }: ItemSheetProps) {
   const [busy, setBusy] = useState(false)
   return (
     <Sheet busy={busy} open={open} onClose={onClose} title={item ? 'Item details' : 'Add an item'}>
-      {open && <ItemForm key={item?.id ?? 'new'} item={item} roomId={roomId} onDone={onClose} onBusy={setBusy} hideShoppingLink={hideShoppingLink} />}
+      {open && <ItemForm key={item?.id ?? 'new'} item={item} roomId={roomId} onDone={onClose} onBusy={setBusy} hideShoppingLink={hideShoppingLink} focusCommentId={focusCommentId} />}
     </Sheet>
   )
 }
 
-function ItemForm({ item, roomId, onDone, onBusy, hideShoppingLink }: { item: Item | null; roomId?: string; onDone: () => void; onBusy: (busy: boolean) => void; hideShoppingLink?: boolean }) {
+function ItemForm({ item, roomId, onDone, onBusy, hideShoppingLink, focusCommentId }: { item: Item | null; roomId?: string; onDone: () => void; onBusy: (busy: boolean) => void; hideShoppingLink?: boolean; focusCommentId?: string | null }) {
   const { user } = useAuth()
   const { items, rooms, members, memberById, createItem, updateItem, deleteItem, setAssignees } = useHousehold()
   const shopping = useShopping()
@@ -419,6 +422,8 @@ function ItemForm({ item, roomId, onDone, onBusy, hideShoppingLink }: { item: It
           placeholder="Anything the others should know"
         />
       </Field>
+
+      {item && <Discussion target={{ item_id: item.id }} focusCommentId={focusCommentId} />}
 
       {item && (
         <Button type="button" variant="ghost" block icon={<Trash2 size={18} aria-hidden />} className="text-danger -mt-2" onClick={() => setConfirmDelete(true)}>

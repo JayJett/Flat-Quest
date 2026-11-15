@@ -259,7 +259,16 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       const row = payload.new as HouseholdRow
       if (row.id === householdId) setHousehold(row)
     }
-    const onMember = () => {
+    const onMember = (payload: RealtimePostgresChangesPayload<HouseholdMemberRow>) => {
+      const old = payload.old as Partial<HouseholdMemberRow>
+      if (payload.eventType === 'DELETE' && old.user_id === userId) {
+        // Removed (or left on another device): access has already ended server-side.
+        // Reload from scratch so every screen drops this flat's data.
+        if (old.household_id && old.household_id !== householdId) return
+        void load()
+        return
+      }
+      if (payload.eventType === 'DELETE' && old.household_id && old.household_id !== householdId) return
       // Membership changes are rare; refetch so profiles come along too.
       void loadHouseholdData(householdId).catch(() => undefined)
     }
@@ -283,6 +292,8 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
         { event: '*', schema: 'public', table: 'household_members', filter: `household_id=eq.${householdId}` },
         onMember,
       )
+      // A removal is a DELETE, which can't be filtered server-side; the payload carries the key.
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'household_members' }, onMember)
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           setSync('live')
@@ -299,7 +310,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       if (channel) void supabase.removeChannel(channel)
       setSync('connecting')
     }
-  }, [householdId, userId, loadHouseholdData])
+  }, [householdId, userId, loadHouseholdData, load])
 
   // Refresh stale data when returning to the app or coming back online.
   useEffect(() => {

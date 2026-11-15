@@ -13,6 +13,7 @@ import { tooLightOnWhite } from '@/lib/color'
 import { PRIORITY_RANK, type Item } from '@/lib/domain'
 import { countsTowardProgress, doneItemsFor, openItemsFor } from '@/lib/stats'
 import { useHousehold } from '@/household/HouseholdProvider'
+import { HouseholdManagement } from '@/household/HouseholdManagement'
 import { BackButton, goBack } from './RoomDetail'
 
 export function FlatmatesPage() {
@@ -66,6 +67,7 @@ export function FlatmatesPage() {
         </ul>
 
         <InvitePanel />
+        <HouseholdManagement />
       </div>
     </>
   )

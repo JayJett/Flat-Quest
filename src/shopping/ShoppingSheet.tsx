@@ -26,10 +26,13 @@ interface ShoppingSheetProps {
   onClose: () => void
   /** Hide the "Edit item" shortcut when this was opened from the item's own details. */
   fromItemDetails?: boolean
+  /** Opened from a notification: show this option straight away (and maybe a comment in it). */
+  initialOptionId?: string | null
+  focusCommentId?: string | null
 }
 
 /** Everything about buying one checklist item: stage, who's sorting it, options, purchase and delivery. */
-export function ShoppingSheet({ open, itemId, onClose, fromItemDetails }: ShoppingSheetProps) {
+export function ShoppingSheet({ open, itemId, onClose, fromItemDetails, initialOptionId, focusCommentId }: ShoppingSheetProps) {
   const { items } = useHousehold()
   // Read the live item so a flatmate's changes show while this is open.
   const item = itemId ? items.find((i) => i.id === itemId) : undefined
@@ -38,7 +41,7 @@ export function ShoppingSheet({ open, itemId, onClose, fromItemDetails }: Shoppi
     <Sheet open={open} onClose={onClose} title={item?.name ?? 'Shopping'} busy={busy}>
       {open &&
         (item ? (
-          <ShoppingBody key={item.id} item={item} onClose={onClose} onBusy={setBusy} fromItemDetails={fromItemDetails} />
+          <ShoppingBody key={item.id} item={item} onClose={onClose} onBusy={setBusy} fromItemDetails={fromItemDetails} initialOptionId={initialOptionId} focusCommentId={focusCommentId} />
         ) : (
           <div className="py-6">
             <p className="font-semibold">This item is no longer on the checklist.</p>
@@ -52,12 +55,26 @@ export function ShoppingSheet({ open, itemId, onClose, fromItemDetails }: Shoppi
   )
 }
 
-function ShoppingBody({ item, onClose, onBusy, fromItemDetails }: { item: Item; onClose: () => void; onBusy: (b: boolean) => void; fromItemDetails?: boolean }) {
+function ShoppingBody({
+  item,
+  onClose,
+  onBusy,
+  fromItemDetails,
+  initialOptionId,
+  focusCommentId,
+}: {
+  item: Item
+  onClose: () => void
+  onBusy: (b: boolean) => void
+  fromItemDetails?: boolean
+  initialOptionId?: string | null
+  focusCommentId?: string | null
+}) {
   const { user } = useAuth()
   const { rooms, memberById, updateItem } = useHousehold()
   const shopping = useShopping()
   const toast = useToast()
-  const [openOption, setOpenOption] = useState<string | null>(null)
+  const [openOption, setOpenOption] = useState<string | null>(initialOptionId ?? null)
   const [adding, setAdding] = useState(false)
   const [purchasing, setPurchasing] = useState(false)
   const [editingItem, setEditingItem] = useState(false)
@@ -257,7 +274,13 @@ function ShoppingBody({ item, onClose, onBusy, fromItemDetails }: { item: Item; 
         )}
       </div>
 
-      <OptionSheet open={openOption !== null} optionId={openOption} item={item} onClose={() => setOpenOption(null)} />
+      <OptionSheet
+        open={openOption !== null}
+        optionId={openOption}
+        item={item}
+        onClose={() => setOpenOption(null)}
+        focusCommentId={openOption === initialOptionId ? focusCommentId : null}
+      />
       <OptionFormSheet open={adding} item={item} option={null} onClose={() => setAdding(false)} />
       <PurchaseSheet open={purchasing} item={item} onClose={() => setPurchasing(false)} />
       {!fromItemDetails && <ItemSheet open={editingItem} item={item} onClose={() => setEditingItem(false)} hideShoppingLink />}

@@ -11,6 +11,7 @@ import { ToastProvider } from '@/components/Toast'
 import { UserScopedHouseholdProvider } from '@/household/HouseholdProvider'
 import { BASE_PATH } from '@/lib/urls'
 
+const ActivityPage = lazy(() => import('@/pages/Activity').then((m) => ({ default: m.ActivityPage })))
 const AuthCallbackPage = lazy(() => import('@/pages/AuthCallback').then((m) => ({ default: m.AuthCallbackPage })))
 const ResetPasswordPage = lazy(() => import('@/pages/AuthCallback').then((m) => ({ default: m.ResetPasswordPage })))
 const FlatmateItemsPage = lazy(() => import('@/pages/Flatmates').then((m) => ({ default: m.FlatmateItemsPage })))
@@ -70,6 +71,7 @@ const router = createBrowserRouter([
           { path: 'flatmates/:userId', element: <FlatmateItemsPage /> },
           { path: 'profile', element: <ProfilePage /> },
           { path: 'settings', element: <SettingsPage /> },
+          { path: 'activity', element: <ActivityPage /> },
         ],
       },
       { path: '*', element: <Navigate to="/" replace /> },
