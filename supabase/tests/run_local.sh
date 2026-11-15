@@ -22,3 +22,5 @@ for f in supabase/migrations/*.sql; do
 done
 psql -v ON_ERROR_STOP=1 -d "$DB" -f supabase/tests/rls_verification.sql | tail -n 4
 FLATQUEST_DB_URL="postgresql://${PGUSER}@${PGHOST}:${PGPORT}/${DB}" supabase/tests/coordinator_race.sh
+psql -q -v ON_ERROR_STOP=1 -d "$DB" -f supabase/tests/phase5_verification.sql 2>&1 | tail -n 1
+psql -q -v ON_ERROR_STOP=1 -d "$DB" -f supabase/tests/phase6_verification.sql 2>&1 | grep -c "PASS:" | sed "s/^/Phase 6 checks passed: /"
