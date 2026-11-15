@@ -22,6 +22,9 @@ import { ConnectionStatus } from './ConnectionStatus'
 import { Avatar, clearMediaCache } from './Avatar'
 import { useFocusTrap } from './Sheet'
 import { TourProvider, useTour } from './Tour'
+import { useOpenEvent } from '@/activity/useOpenEvent'
+import { NotificationBell, NotificationDrawer } from '@/notifications/NotificationDrawer'
+import { NotificationProvider, useNotifications, type Notice } from '@/notifications/NotificationProvider'
 
 const PRIMARY_NAV: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
   { to: '/', label: 'Home', icon: House, end: true },
@@ -30,14 +33,61 @@ const PRIMARY_NAV: { to: string; label: string; icon: LucideIcon; end?: boolean 
   { to: '/flatmates', label: 'Flatmates', icon: Users },
 ]
 
-const DrawerContext = createContext<{ open: () => void }>({ open: () => undefined })
+interface Panels {
+  /** Opens the menu drawer (closing notifications). */
+  open: () => void
+  /** Opens the notification drawer (closing the menu). */
+  openNotifications: () => void
+}
+const DrawerContext = createContext<Panels>({ open: () => undefined, openNotifications: () => undefined })
 export const useDrawer = () => useContext(DrawerContext)
 
+type PanelState = { panel?: 'notifications' } | null
+
 export function AppShell() {
+  return (
+    <NotificationProvider>
+      <Shell />
+    </NotificationProvider>
+  )
+}
+
+function Shell() {
   const { household } = useHousehold()
   useEffect(() => () => { clearMediaCache() }, [household?.id])
   const [drawerOpen, setDrawerOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
+  const openEvent = useOpenEvent()
+  const { markRead } = useNotifications()
+  // The notification drawer is a history entry, so the browser's Back button (and the
+  // Android back gesture) closes it instead of leaving the page.
+  const notificationsOpen = (location.state as PanelState)?.panel === 'notifications'
+  const pushedPanel = useRef(false)
+  const here = `${location.pathname}${location.search}${location.hash}`
+  const openNotifications = () => {
+    setDrawerOpen(false)
+    if (notificationsOpen) return
+    pushedPanel.current = true
+    navigate(here, { state: { panel: 'notifications' } })
+  }
+  const closeNotifications = () => {
+    if (!notificationsOpen) return
+    if (pushedPanel.current) navigate(-1)
+    else navigate(here, { replace: true, state: null })
+    pushedPanel.current = false
+  }
+  const openMenu = () => {
+    closeNotifications()
+    setDrawerOpen(true)
+  }
+  const openNotice = (notice: Notice) => {
+    void markRead(notice.id)
+    const wasPushed = pushedPanel.current
+    // Replace the drawer's history entry: Back from the destination returns to this page.
+    if (openEvent(notice.event, { replace: true })) pushedPanel.current = false
+    else pushedPanel.current = wasPushed
+  }
 
   // Close the drawer on navigation.
   const [lastPath, setLastPath] = useState(location.pathname)
@@ -54,7 +104,7 @@ export function AppShell() {
   return (
     <ShoppingProvider>
     <TourProvider>
-    <DrawerContext.Provider value={{ open: () => setDrawerOpen(true) }}>
+    <DrawerContext.Provider value={{ open: openMenu, openNotifications }}>
       <div className="lg:flex" style={{ paddingLeft: 'var(--safe-left)', paddingRight: 'var(--safe-right)' }}>
         <SideRail />
         <main
@@ -66,7 +116,8 @@ export function AppShell() {
         </main>
       </div>
       <BottomNav />
-      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <Drawer open={drawerOpen && !notificationsOpen} onClose={() => setDrawerOpen(false)} />
+      <NotificationDrawer open={notificationsOpen} onClose={closeNotifications} onOpenNotice={openNotice} />
     </DrawerContext.Provider>
     </TourProvider>
     </ShoppingProvider>
@@ -129,7 +180,10 @@ export function PageHeader({
             )}
           </AnimatePresence>
         </div>
-        <div className="-mr-2 flex items-center gap-1">{actions}</div>
+        <div className="-mr-2 flex items-center gap-1">
+          {actions}
+          <NotificationBell onOpen={drawer.openNotifications} />
+        </div>
       </div>
     </header>
   )

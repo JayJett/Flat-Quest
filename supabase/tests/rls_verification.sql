@@ -129,7 +129,8 @@ values
   perform set_config('request.jwt.claims', '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}', true);
   perform rls_check.rec('D: joins (3 of 4)', 'true', (select (public.accept_household_invite(code) = hid)::text from rls_check.ctx));
   perform rls_check.rec('D: assigned to Rug', 'ok', rls_check.try($q$select public.set_item_assignees((select item2 from rls_check.ctx), array['44444444-4444-4444-8444-444444444444'::uuid, '11111111-1111-4111-8111-111111111111'::uuid])$q$));
-  perform rls_check.rec('D: leaves the household', '1', rls_check.val($q$with u as (delete from public.household_members where user_id = '44444444-4444-4444-8444-444444444444' returning 1) select count(*)::text from u$q$));
+  -- Phase 6: leaving goes through leave_household(); a raw delete of the membership row is refused.
+  perform rls_check.rec('D: leaves the household', 'ok', rls_check.try($q$select public.leave_household((select hid from rls_check.ctx))$q$));
   perform set_config('role', 'none', true);
   perform rls_check.rec('After D leaves, their assignments are removed; A stays', '11111111-1111-4111-8111-111111111111',
     (select string_agg(user_id::text, ',') from public.item_assignees a, rls_check.ctx where a.item_id = rls_check.ctx.item2));
@@ -319,7 +320,7 @@ values
   insert into public.product_preferences (item_id, household_id, option_id) select item1, hid, opt_a from rls_check.ctx;
   insert into public.purchase_coordinators (item_id, household_id) select item2, hid from rls_check.ctx;
   perform public.save_item_purchase((select item2 from rls_check.ctx), null, null, '44444444-4444-4444-8444-444444444444', date '2026-11-12');
-  delete from public.household_members where user_id = '44444444-4444-4444-8444-444444444444';
+  perform public.leave_household((select hid from rls_check.ctx));
   perform set_config('role', 'none', true);
   perform rls_check.rec('After D leaves: preference and coordination gone; purchase kept without a buyer; options kept', '0,0,true,2',
     (select (select count(*) from public.product_preferences where user_id = '44444444-4444-4444-8444-444444444444')::text || ','

@@ -109,6 +109,15 @@ Strangers still can't see anything. Without an invite link from someone in your 
 
 ---
 
+## Part 4b: Notifications, discussions and managing the flat
+
+- **Bell (top right):** a red number means something is waiting for you, such as a mention, a reply, or a change to something you're on. Tap the bell to open the list. Tap a notification to go straight to it. Swipe the panel to the right, tap outside it, or press Back to close it. **Mark all read** clears the number on all your devices.
+- **Discussion:** open any item, product option or wishlist idea and scroll to **Discussion**. Type **@** and pick a flatmate's name to bring them in; they'll get a notification.
+- **Activity:** on Home, **Around the flat** shows the latest changes; tap **View all** for the full history. It starts from the day this update went live, and older ticks and ideas are listed separately underneath.
+- **Flatmates → Membership:** the owner (Jarden) can change how many people can join, **Manage** a flatmate to **Make owner** or **Remove from flat**. Everyone sees a confirmation first. Other flatmates can **Leave this flat**. The owner has to hand ownership to someone before leaving.
+
+---
+
 ## Part 5: Landlord's appliances (already done)
 
 The fridge/freezer, microwave and washing machine are marked **Provided with flat** (owned by the landlord), and a dishwasher and dryer were added. Tick each one once you’ve checked it’s actually there; they never show up as things to buy.

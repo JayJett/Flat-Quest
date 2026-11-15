@@ -1,6 +1,7 @@
 import { FileDown, Plus } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { PageHeader } from '@/components/AppShell'
 import { useToast } from '@/components/Toast'
 import { Button, EmptyState, ErrorPanel, IconButton, Segmented, Spinner } from '@/components/ui'
@@ -23,6 +24,21 @@ function WishlistScreen() {
   const toast = useToast()
   const [sort, setSort] = useState<WishSort>('popular')
   const [open, setOpen] = useState<Idea | null>(null)
+  const [focusComment, setFocusComment] = useState<string | null>(null)
+  const [params, setParams] = useSearchParams()
+  const wantedIdea = params.get('idea')
+  // Deep link from a notification or the activity timeline: /wishlist?idea=<id>[&discuss=<comment>]
+  useEffect(() => {
+    if (!wantedIdea || status !== 'ready') return
+    const idea = ideas.find((i) => i.id === wantedIdea)
+    /* eslint-disable react-hooks/set-state-in-effect -- consuming a one-off URL parameter */
+    if (idea) {
+      setOpen(idea)
+      setFocusComment(params.get('discuss'))
+    } else toast.show('That idea has since been removed from the wishlist.')
+    /* eslint-enable react-hooks/set-state-in-effect */
+    setParams({}, { replace: true })
+  }, [wantedIdea, status, ideas, params, setParams, toast])
   const [adding, setAdding] = useState(false)
   const [importing, setImporting] = useState(false)
   const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms])
@@ -116,7 +132,15 @@ function WishlistScreen() {
           </>
         )}
       </div>
-      <IdeaSheet open={open !== null} idea={open} onClose={() => setOpen(null)} />
+      <IdeaSheet
+        open={open !== null}
+        idea={open}
+        focusCommentId={focusComment}
+        onClose={() => {
+          setOpen(null)
+          setFocusComment(null)
+        }}
+      />
       <IdeaSheet open={adding} idea={null} onClose={() => setAdding(false)} />
     </>
   )

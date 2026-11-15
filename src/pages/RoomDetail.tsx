@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronLeft, Pencil, Plus } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
-import { useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { useAuth } from '@/auth/AuthProvider'
 import { PageHeader } from '@/components/AppShell'
 import { ItemRow } from '@/components/ItemRow'
@@ -13,6 +13,8 @@ import { roomColor } from '@/design/tokens'
 import { PRIORITIES, PRIORITY_LABEL, PRIORITY_RANK, STATUS_RANK, type Item } from '@/lib/domain'
 import { isUnclaimed, progressOf } from '@/lib/stats'
 import { useHousehold } from '@/household/HouseholdProvider'
+import { useToast } from '@/components/Toast'
+import { ShoppingSheet } from '@/shopping/ShoppingSheet'
 
 type Filter = 'all' | 'mine' | 'unclaimed' | 'done'
 type Sort = 'priority' | 'name' | 'status'
@@ -20,14 +22,36 @@ type Sort = 'priority' | 'name' | 'status'
 export function RoomDetailPage() {
   const { roomId } = useParams()
   const { user } = useAuth()
-  const { rooms, items } = useHousehold()
+  const { rooms, items, state } = useHousehold()
   const navigate = useNavigate()
+  const toast = useToast()
+  const [params, setParams] = useSearchParams()
+  /** Opened from a notification or the timeline: which comment to bring into view. */
+  const [focus, setFocus] = useState<{ comment: string | null; option: string | null } | null>(null)
+  const wantedItem = params.get('item')
+  const [shoppingFor, setShoppingFor] = useState<string | null>(null)
   const room = rooms.find((r) => r.id === roomId)
   const [filter, setFilter] = useState<Filter>('all')
   const [sort, setSort] = useState<Sort>('priority')
   const [open, setOpen] = useState<Item | null>(null)
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState(false)
+
+  // Deep links: /rooms/<room>?item=<id>[&option=<id>][&discuss=<comment>]
+  useEffect(() => {
+    if (!wantedItem || state !== 'ready') return
+    const item = items.find((i) => i.id === wantedItem)
+    /* eslint-disable react-hooks/set-state-in-effect -- consuming a one-off URL parameter */
+    if (item) {
+      setFocus({ comment: params.get('discuss'), option: params.get('option') })
+      if (!params.get('option')) setOpen(item)
+      else setShoppingFor(item.id)
+    } else {
+      toast.show('That item has since been removed from the list.')
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+    setParams({}, { replace: true })
+  }, [wantedItem, state, items, params, setParams, toast])
 
   const roomItems = useMemo(() => items.filter((i) => i.room_id === roomId), [items, roomId])
   const progress = useMemo(() => progressOf(roomItems), [roomItems])
@@ -224,7 +248,25 @@ export function RoomDetailPage() {
         )}
       </div>
 
-      <ItemSheet open={open !== null} item={open} onClose={() => setOpen(null)} />
+      <ItemSheet
+        open={open !== null}
+        item={open}
+        focusCommentId={focus?.option ? null : focus?.comment}
+        onClose={() => {
+          setOpen(null)
+          setFocus(null)
+        }}
+      />
+      <ShoppingSheet
+        open={shoppingFor !== null}
+        itemId={shoppingFor}
+        initialOptionId={focus?.option}
+        focusCommentId={focus?.comment}
+        onClose={() => {
+          setShoppingFor(null)
+          setFocus(null)
+        }}
+      />
       <ItemSheet open={adding} item={null} roomId={room.id} onClose={() => setAdding(false)} />
       <RoomSheet open={editing} room={room} onClose={() => setEditing(false)} />
     </>
