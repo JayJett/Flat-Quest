@@ -5,7 +5,7 @@
 -- only behaviour removed is the client-side "delete my own membership row" policy, which
 -- is replaced by leave_household() so an owner can never walk out and orphan the flat.
 -- Recovery: supabase/rollback/pre_phase6_snapshot.sql (run first) and
--- supabase/rollback/20261115000001_connected_living_down.sql, which drops everything
+-- supabase/rollback/20261115192306_connected_living_down.sql, which drops everything
 -- created here and restores the previous membership policy.
 
 -- ───────────────────────── 1. Household events (one source of truth) ─────────────────────────

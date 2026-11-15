@@ -1,4 +1,4 @@
--- EMERGENCY ONLY. Reverses 20261115000001_connected_living.sql.
+-- EMERGENCY ONLY. Reverses 20261115192306_connected_living.sql.
 --
 -- This DELETES all discussions, notifications and activity history recorded since Phase 6.
 -- No checklist, wishlist, shopping, Visual Home or membership data is touched, and the
