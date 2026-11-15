@@ -1,6 +1,6 @@
 import { AtSign, Bell, Check, CheckCheck, Gift, Images, MessageCircle, PackageCheck, ShoppingBag, Sparkles, Truck, UserRound, Users, X, type LucideIcon } from 'lucide-react'
-import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion, type PanInfo } from 'motion/react'
-import { useMemo, useRef, useState } from 'react'
+import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } from 'motion/react'
+import { useMemo, useRef, useState, type PointerEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Avatar } from '@/components/Avatar'
 import { useFocusTrap } from '@/components/Sheet'
@@ -69,22 +69,55 @@ export function NotificationDrawer({
   useFocusTrap(open, ref, onClose)
   // Backdrop fades with the drag so the panel visibly "lets go" of the page.
   const fade = useMotionValue(1)
-  // Horizontal position, owned here so a released drag always settles explicitly
-  // (snap-to-origin alone proved unreliable in WebKit).
+  // Horizontal position. The swipe-to-close gesture is handled here with plain pointer
+  // events (rather than a drag library) so it behaves the same in every browser engine.
   const x = useMotionValue<number | string>(reduce ? 0 : '100%')
+  const gesture = useRef<{ id: number; x0: number; y0: number; axis: 'x' | 'y' | null; lastX: number; lastT: number; v: number; off: number } | null>(null)
+  const justDragged = useRef(false)
 
-  const onDrag = (_: unknown, info: PanInfo) => {
-    const width = ref.current?.offsetWidth ?? 360
-    fade.set(Math.max(0, 1 - Math.max(0, info.offset.x) / width))
-  }
-  const onDragEnd = (_: unknown, info: PanInfo) => {
-    const width = ref.current?.offsetWidth ?? 360
-    if (info.offset.x > width * CLOSE_FRACTION || info.velocity.x > CLOSE_VELOCITY) {
-      onClose()
-      return
-    }
+  const settle = () => {
     animate(x, 0, reduce ? { duration: 0 } : { type: 'spring', stiffness: 520, damping: 42 })
     animate(fade, 1, { duration: reduce ? 0 : 0.2 })
+  }
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    gesture.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY, axis: null, lastX: e.clientX, lastT: e.timeStamp, v: 0, off: 0 }
+  }
+  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    const g = gesture.current
+    if (!g || e.pointerId !== g.id) return
+    const dx = e.clientX - g.x0
+    const dy = e.clientY - g.y0
+    if (!g.axis) {
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return
+      // Only a mostly-horizontal move to the right is a swipe; anything else is a scroll.
+      g.axis = dx > 0 && Math.abs(dx) > Math.abs(dy) ? 'x' : 'y'
+      if (g.axis === 'x') e.currentTarget.setPointerCapture(e.pointerId)
+    }
+    if (g.axis !== 'x') return
+    const width = ref.current?.offsetWidth ?? 360
+    const dt = Math.max(1, e.timeStamp - g.lastT)
+    g.v = ((e.clientX - g.lastX) / dt) * 1000
+    g.lastX = e.clientX
+    g.lastT = e.timeStamp
+    g.off = Math.max(0, dx)
+    x.set(g.off)
+    fade.set(Math.max(0, 1 - g.off / width))
+  }
+  const onPointerEnd = (e: PointerEvent<HTMLDivElement>) => {
+    const g = gesture.current
+    if (!g || e.pointerId !== g.id) return
+    gesture.current = null
+    if (g.axis !== 'x') return
+    // A finger that rested before letting go is not a flick.
+    if (e.timeStamp - g.lastT > 80) g.v = 0
+    justDragged.current = g.off > 6
+    // The click that follows a release arrives in the same turn; never let the flag linger.
+    window.setTimeout(() => (justDragged.current = false), 0)
+    const width = ref.current?.offsetWidth ?? 360
+    // A cancelled pointer (the browser took over) always springs back.
+    if (e.type === 'pointerup' && (g.off > width * CLOSE_FRACTION || g.v > CLOSE_VELOCITY)) onClose()
+    else settle()
   }
 
   return createPortal(
@@ -115,13 +148,18 @@ export function NotificationDrawer({
             animate={{ x: 0 }}
             exit={{ x: '100%', transition: { duration: reduce ? 0 : 0.22, ease: [0.4, 0, 1, 1] } }}
             transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 44 }}
-            drag="x"
-            dragDirectionLock
-            dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={{ left: 0, right: 1 }}
-            dragMomentum={false}
-            onDrag={onDrag}
-            onDragEnd={onDragEnd}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerEnd}
+            onPointerCancel={onPointerEnd}
+            onClickCapture={(e) => {
+              // The release at the end of a swipe is not a tap on whatever is underneath.
+              if (justDragged.current) {
+                e.preventDefault()
+                e.stopPropagation()
+                justDragged.current = false
+              }
+            }}
           >
             <NotificationPanel onClose={onClose} onOpenNotice={onOpenNotice} />
           </motion.div>

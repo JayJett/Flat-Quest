@@ -126,9 +126,14 @@ test.describe('notification centre', () => {
     // A short drag: the panel moves with the pointer, then settles back.
     await page.mouse.move(startX, y)
     await page.mouse.down()
-    await page.mouse.move(startX + box.width * 0.15, y, { steps: 8 })
+    // At a deliberate, human pace, then a pause before letting go.
+    for (let i = 1; i <= 8; i++) {
+      await page.mouse.move(startX + (box.width * 0.15 * i) / 8, y)
+      await page.waitForTimeout(30)
+    }
     const mid = (await drawer(page).boundingBox())!
     expect(mid.x).toBeGreaterThan(box.x + box.width * 0.08)
+    await page.waitForTimeout(120)
     await page.mouse.up()
     await expect.poll(async () => Math.abs((await drawer(page).boundingBox())!.x - box.x)).toBeLessThan(2)
     await expect(drawer(page)).toBeVisible()
@@ -145,6 +150,14 @@ test.describe('notification centre', () => {
     await page.mouse.move(startX, y)
     await page.mouse.down()
     await page.mouse.move(startX + box.width * 0.5, y, { steps: 12 })
+    await page.mouse.up()
+    await expect(drawer(page)).toBeHidden()
+
+    // A quick flick closes it even when it travels less than the threshold.
+    await openDrawer(page)
+    await page.mouse.move(startX, y)
+    await page.mouse.down()
+    await page.mouse.move(startX + box.width * 0.2, y, { steps: 3 })
     await page.mouse.up()
     await expect(drawer(page)).toBeHidden()
   })
@@ -236,6 +249,8 @@ test.describe('discussions', () => {
     const box = discussion.getByRole('textbox', { name: 'Add a comment…' })
     await box.fill('Can you check @Ma')
     await discussion.getByRole('option').getByRole('button', { name: '@Madi' }).click()
+    await expect(box).toHaveValue('Can you check @Madi ')
+    await box.press('End')
     await box.pressSequentially('<img src=x onerror="window.hacked=1"> please')
     await discussion.getByRole('button', { name: 'Send' }).click()
     await expect(discussion.getByTestId('comment')).toHaveCount(1)
