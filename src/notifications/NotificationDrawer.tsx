@@ -71,7 +71,7 @@ export function NotificationDrawer({
   const fade = useMotionValue(1)
   // Horizontal position, owned here so a released drag always settles explicitly
   // (snap-to-origin alone proved unreliable in WebKit).
-  const x = useMotionValue<number | string>('100%')
+  const x = useMotionValue<number | string>(reduce ? 0 : '100%')
 
   const onDrag = (_: unknown, info: PanInfo) => {
     const width = ref.current?.offsetWidth ?? 360
@@ -111,7 +111,7 @@ export function NotificationDrawer({
             data-testid="notification-drawer"
             className="bg-surface shadow-float absolute inset-y-0 right-0 flex w-[min(92vw,420px)] flex-col rounded-l-[28px] outline-none"
             style={{ x, paddingRight: 'var(--safe-right)', touchAction: 'pan-y' }}
-            initial={{ x: '100%' }}
+            initial={reduce ? false : { x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%', transition: { duration: reduce ? 0 : 0.22, ease: [0.4, 0, 1, 1] } }}
             transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 44 }}
