@@ -21,8 +21,14 @@ function seed(state: State) {
 async function openDrawer(page: Page) {
   await bell(page).click()
   await expect(drawer(page)).toBeVisible()
-  // Let the slide-in settle before measuring or dragging.
-  await page.waitForTimeout(450)
+  // Let the slide-in settle (flush with the right edge) before measuring or dragging.
+  const width = page.viewportSize()!.width
+  await expect
+    .poll(async () => {
+      const box = await drawer(page).boundingBox()
+      return box ? Math.abs(box.x + box.width - width) : Infinity
+    }, { timeout: 5000 })
+    .toBeLessThan(1)
 }
 
 test.describe('notification centre', () => {
