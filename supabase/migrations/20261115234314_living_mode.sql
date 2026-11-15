@@ -2,7 +2,7 @@
 --
 -- Additive. No existing row is modified. Extends the Phase 6 household_events /
 -- notifications system with new event types instead of creating another log.
--- Recovery: supabase/rollback/20261116000001_living_mode_down.sql.
+-- Recovery: supabase/rollback/20261115234314_living_mode_down.sql.
 
 -- ───────────────────────── 1. Essentials (consumables that get used up and re-bought) ─────────────────────────
 -- One row per essential for the life of the household. Running out again flips the same row

@@ -1,4 +1,4 @@
--- EMERGENCY ONLY. Reverses 20261116000001_living_mode.sql.
+-- EMERGENCY ONLY. Reverses 20261115234314_living_mode.sql.
 --
 -- This DELETES all essentials, restock history, household tasks and personal preferences,
 -- and the activity/notifications those created. Furnishing, shopping, Visual Home,
