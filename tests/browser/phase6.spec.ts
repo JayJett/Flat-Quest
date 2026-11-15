@@ -310,8 +310,11 @@ test.describe('household management', () => {
 
     await panel.getByRole('button', { name: 'Change' }).click()
     const cap = page.getByRole('dialog', { name: 'How many people live here?' })
-    for (let i = 0; i < 4; i++) await cap.getByRole('button', { name: 'One fewer' }).click({ force: true })
+    await cap.getByRole('button', { name: 'One fewer' }).click()
+    await cap.getByRole('button', { name: 'One fewer' }).click()
     await expect(cap.locator('output')).toHaveText('2')
+    // Never below the people already here.
+    await expect(cap.getByRole('button', { name: 'One fewer' })).toBeDisabled()
     await cap.getByRole('button', { name: 'One more' }).click()
     await cap.getByRole('button', { name: 'Save' }).click()
     await expect.poll(() => state.rpcCalls.find((c) => c.name === 'set_member_limit')?.body).toMatchObject({ p_household: hid, p_limit: 3 })

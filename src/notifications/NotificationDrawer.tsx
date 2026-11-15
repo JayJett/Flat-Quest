@@ -69,6 +69,9 @@ export function NotificationDrawer({
   useFocusTrap(open, ref, onClose)
   // Backdrop fades with the drag so the panel visibly "lets go" of the page.
   const fade = useMotionValue(1)
+  // Horizontal position, owned here so a released drag always settles explicitly
+  // (snap-to-origin alone proved unreliable in WebKit).
+  const x = useMotionValue<number | string>('100%')
 
   const onDrag = (_: unknown, info: PanInfo) => {
     const width = ref.current?.offsetWidth ?? 360
@@ -76,8 +79,12 @@ export function NotificationDrawer({
   }
   const onDragEnd = (_: unknown, info: PanInfo) => {
     const width = ref.current?.offsetWidth ?? 360
-    if (info.offset.x > width * CLOSE_FRACTION || info.velocity.x > CLOSE_VELOCITY) onClose()
-    else animate(fade, 1, { duration: reduce ? 0 : 0.2 })
+    if (info.offset.x > width * CLOSE_FRACTION || info.velocity.x > CLOSE_VELOCITY) {
+      onClose()
+      return
+    }
+    animate(x, 0, reduce ? { duration: 0 } : { type: 'spring', stiffness: 520, damping: 42 })
+    animate(fade, 1, { duration: reduce ? 0 : 0.2 })
   }
 
   return createPortal(
@@ -103,7 +110,7 @@ export function NotificationDrawer({
             tabIndex={-1}
             data-testid="notification-drawer"
             className="bg-surface shadow-float absolute inset-y-0 right-0 flex w-[min(92vw,420px)] flex-col rounded-l-[28px] outline-none"
-            style={{ paddingRight: 'var(--safe-right)', touchAction: 'pan-y' }}
+            style={{ x, paddingRight: 'var(--safe-right)', touchAction: 'pan-y' }}
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%', transition: { duration: reduce ? 0 : 0.22, ease: [0.4, 0, 1, 1] } }}
@@ -113,7 +120,6 @@ export function NotificationDrawer({
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={{ left: 0, right: 1 }}
             dragMomentum={false}
-            dragSnapToOrigin
             onDrag={onDrag}
             onDragEnd={onDragEnd}
           >
