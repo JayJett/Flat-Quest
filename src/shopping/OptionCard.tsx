@@ -64,7 +64,7 @@ export function PreferButton({
         onToggle()
       }}
       className={`pressable inline-flex items-center gap-1.5 rounded-xl font-bold tabular-nums transition-colors ${
-        active ? 'bg-accent text-white' : 'bg-surface text-ink'
+        active ? 'bg-accent text-on-accent' : 'bg-surface text-ink'
       } ${large ? 'min-h-12 px-4 text-[16px]' : 'min-h-11 px-3 text-[15px]'}`}
     >
       <motion.span

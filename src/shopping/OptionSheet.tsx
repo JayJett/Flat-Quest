@@ -189,7 +189,7 @@ function OptionDetails({
                 : `Add ${room.name}’s measurements to see a rough comparison.`}
             </p>
           )}
-          <button type="button" onClick={() => setMeasuring(true)} className="text-accent mt-1 min-h-11 text-[15px] font-bold">
+          <button type="button" onClick={() => setMeasuring(true)} className="text-accent-ink mt-1 min-h-11 text-[15px] font-bold">
             {roomSize ? `Room: ${roomSize}. Edit` : 'Add room measurements'}
           </button>
         </section>
@@ -409,7 +409,7 @@ function OptionForm({ item, option, onDone, onBusy }: { item: Item; option: Prod
           <p className="font-semibold">Product photo</p>
           <p className="text-ink-2 text-[14px]">Optional. A screenshot from the shop’s page works well.</p>
           <div className="mt-1 flex gap-4">
-            <button type="button" onClick={() => fileRef.current?.click()} className="text-accent min-h-11 text-[15px] font-bold">
+            <button type="button" onClick={() => fileRef.current?.click()} className="text-accent-ink min-h-11 text-[15px] font-bold">
               {hasPhoto ? 'Replace' : 'Choose photo'}
             </button>
             {hasPhoto && (

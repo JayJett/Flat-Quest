@@ -185,7 +185,7 @@ export function ConfirmSheet({
           data-autofocus
           disabled={busy}
           onClick={onConfirm}
-          className={`pressable min-h-12 rounded-2xl font-semibold ${danger ? 'bg-danger text-white' : 'bg-accent text-white'} disabled:opacity-60`}
+          className={`pressable min-h-12 rounded-2xl font-semibold ${danger ? 'bg-danger text-on-accent' : 'bg-accent text-on-accent'} disabled:opacity-60`}
         >
           {busy ? 'Working…' : confirmLabel}
         </button>

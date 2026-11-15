@@ -11,6 +11,7 @@ import {
 } from 'react'
 import { useAuth } from '@/auth/AuthProvider'
 import { useToast } from '@/components/Toast'
+import { useCelebration } from '@/motion/Celebration'
 import type { HouseholdMemberRow, HouseholdRow, ItemAssigneeRow, ItemRow, ProfileRow, RoomRow } from '@/lib/database.types'
 import { toItem, type Household, type Item, type Member, type Profile, type Room } from '@/lib/domain'
 import { completionMilestone } from '@/lib/celebrations'
@@ -86,6 +87,7 @@ function byOrder<T extends { sort_order: number; created_at: string }>(a: T, b: 
 export function HouseholdProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const toast = useToast()
+  const celebration = useCelebration()
   const userId = user?.id ?? null
 
   const [state, setState] = useState<LoadState>('loading')
@@ -410,10 +412,12 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       celebrated.current.add(milestoneKey)
       const room = rooms.find((r) => r.id === item.room_id)
       toast.success(milestone === 100 ? (room?.name ?? 'Room') + ' is ready. Nice work, team!' : (room?.name ?? 'Room') + ' is ' + milestone + '% ready')
+      // A room reaching 100% is a real milestone: a small burst (none for Minimal / reduced motion).
+      if (milestone === 100) celebration.burst()
     }
     if (!pending.current.has(id)) setItems((prev) => prev.map((i) => (i.id === id ? item : i)))
     return { ok: true, data: item }
-  }, [rooms, toast, loadHouseholdData])
+  }, [rooms, toast, loadHouseholdData, celebration])
 
   const deleteItem = useCallback<HouseholdState['deleteItem']>(async (id) => {
     const before = itemsRef.current.find((i) => i.id === id)

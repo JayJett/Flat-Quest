@@ -402,7 +402,7 @@ function TourOverlay({
                 ref={nextRef}
                 type="button"
                 onClick={() => go(index + 1)}
-                className="pressable bg-accent active:bg-accent-press min-h-12 flex-1 rounded-2xl px-5 font-semibold text-white"
+                className="pressable bg-accent active:bg-accent-press min-h-12 flex-1 rounded-2xl px-5 font-semibold text-on-accent"
               >
                 {isLast ? 'Start exploring' : index === 0 ? 'Show me' : 'Next'}
               </button>

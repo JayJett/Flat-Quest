@@ -1,4 +1,4 @@
-import { AtSign, Bell, Check, CheckCheck, Gift, Images, MessageCircle, PackageCheck, ShoppingBag, Sparkles, Truck, UserRound, Users, X, type LucideIcon } from 'lucide-react'
+import { ListTodo, ShoppingBasket, AtSign, Bell, Check, CheckCheck, Gift, Images, MessageCircle, PackageCheck, ShoppingBag, Sparkles, Truck, UserRound, Users, X, type LucideIcon } from 'lucide-react'
 import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } from 'motion/react'
 import { useMemo, useRef, useState, type PointerEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -22,6 +22,8 @@ const KIND_ICON: Record<EventKind, LucideIcon> = {
   comment: MessageCircle,
   member: Users,
   history: Bell,
+  essential: ShoppingBasket,
+  task: ListTodo,
 }
 
 /** Top-right bell. The badge only appears when something is unread. */
@@ -221,7 +223,7 @@ function NotificationPanel({ onClose, onOpenNotice }: { onClose: () => void; onO
             type="button"
             onClick={() => void markAllRead()}
             disabled={unread === 0}
-            className="pressable text-accent inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl px-2 text-[14px] font-bold disabled:opacity-35"
+            className="pressable text-accent-ink inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl px-2 text-[14px] font-bold disabled:opacity-35"
           >
             <CheckCheck size={18} aria-hidden />
             Mark all read

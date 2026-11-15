@@ -273,7 +273,7 @@ export function Discussion({ target, focusCommentId }: { target: DiscussionTarge
         {state === 'error' && (
           <p className="text-ink-2 mt-2 text-[14px]" role="status">
             Comments couldn’t load.{' '}
-            <button type="button" className="text-accent font-bold underline" onClick={() => void load()}>
+            <button type="button" className="text-accent-ink font-bold underline" onClick={() => void load()}>
               Try again
             </button>
           </p>
@@ -282,7 +282,7 @@ export function Discussion({ target, focusCommentId }: { target: DiscussionTarge
           <p className="text-ink-2 mt-1 text-[14px]">No comments yet. Ask a question or share a thought — use @ to bring someone in.</p>
         )}
         {threads.length > shown.length && (
-          <button type="button" onClick={() => setShowAll(true)} className="pressable text-accent mt-2 min-h-10 rounded-lg text-[14px] font-bold">
+          <button type="button" onClick={() => setShowAll(true)} className="pressable text-accent-ink mt-2 min-h-10 rounded-lg text-[14px] font-bold">
             Show {threads.length - shown.length} earlier
           </button>
         )}
@@ -339,7 +339,7 @@ function MentionText({ body, names }: { body: string; names: string[] }) {
     <>
       {parts.map((part, i) =>
         i % 2 === 1 ? (
-          <strong key={i} className="text-accent font-bold">
+          <strong key={i} className="text-accent-ink font-bold">
             {part}
           </strong>
         ) : (
@@ -465,7 +465,7 @@ function Composer({
             aria-label={submitLabel}
             disabled={!text.trim() || over || sending}
             onClick={() => void submit()}
-            className="pressable bg-accent disabled:bg-accent/40 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white"
+            className="pressable bg-accent disabled:bg-accent/40 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-on-accent"
           >
             <SendHorizontal size={20} aria-hidden />
           </button>

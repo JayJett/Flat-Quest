@@ -19,9 +19,15 @@
   --color-ink-3: #a3a3a8;
   --color-line: #e7e7ea;
 
+  /* Personal accent (Phase 7). These are the default "Electric Blue" values; a member's own
+     theme overrides them on <html> (see src/personal/themes.ts). Room, success and error
+     colours never change with the theme. */
   --color-accent: #3657e8;
   --color-accent-press: #2945c9;
   --color-accent-soft: #eef1fd;
+  /* Text/icons on an accent fill, and accent-coloured text on white (both ≥ 4.5:1). */
+  --color-on-accent: #ffffff;
+  --color-accent-ink: #3657e8;
   --color-periwinkle: #8585f5;
   --color-periwinkle-ink: #5b5bd6;
   --color-green: #42c493;
@@ -75,7 +81,7 @@
 
   /* Accessible, visible focus for keyboard users only. */
   :focus-visible {
-    outline: 2.5px solid var(--color-accent);
+    outline: 2.5px solid var(--color-accent-ink);
     outline-offset: 2px;
     border-radius: 10px;
   }
@@ -107,6 +113,20 @@
   }
   .pressable:active {
     transform: scale(0.97);
+  }
+  /* Personal motion setting (Phase 7). The OS reduced-motion rule below still wins. */
+  html[data-motion='playful'] .pressable {
+    transition:
+      transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1),
+      background-color 160ms ease,
+      opacity 160ms ease;
+  }
+  html[data-motion='playful'] .pressable:active {
+    transform: scale(0.95);
+  }
+  html[data-motion='minimal'] .pressable:active,
+  html[data-motion='reduced'] .pressable:active {
+    transform: none;
   }
 
   .field {

@@ -5,7 +5,7 @@ import { forwardRef, useEffect, useId, type ButtonHTMLAttributes, type ReactNode
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'ink'
 
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-accent text-white active:bg-accent-press disabled:bg-accent/40',
+  primary: 'bg-accent text-on-accent active:bg-accent-press disabled:bg-accent/40',
   ink: 'bg-ink text-white disabled:bg-ink/40',
   secondary: 'bg-surface-2 text-ink active:bg-surface-3 disabled:text-ink-3',
   ghost: 'bg-transparent text-ink active:bg-surface-2 disabled:text-ink-3',

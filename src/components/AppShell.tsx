@@ -23,6 +23,7 @@ import { Avatar, clearMediaCache } from './Avatar'
 import { useFocusTrap } from './Sheet'
 import { TourProvider, useTour } from './Tour'
 import { useOpenEvent } from '@/activity/useOpenEvent'
+import { LivingProvider } from '@/living/LivingProvider'
 import { NotificationBell, NotificationDrawer } from '@/notifications/NotificationDrawer'
 import { NotificationProvider, useNotifications, type Notice } from '@/notifications/NotificationProvider'
 
@@ -47,7 +48,9 @@ type PanelState = { panel?: 'notifications' } | null
 export function AppShell() {
   return (
     <NotificationProvider>
-      <Shell />
+      <LivingProvider>
+        <Shell />
+      </LivingProvider>
     </NotificationProvider>
   )
 }
@@ -213,7 +216,7 @@ function BottomNav() {
                   <span>{label}</span>
                   <motion.span
                     aria-hidden
-                    className="bg-ink h-1 w-1 rounded-full"
+                    className="bg-accent h-1.5 w-1.5 rounded-full"
                     initial={false}
                     animate={{ opacity: isActive ? 1 : 0, scale: isActive ? 1 : 0 }}
                     transition={{ duration: 0.18 }}
