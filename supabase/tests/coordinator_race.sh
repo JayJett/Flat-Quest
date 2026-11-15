@@ -3,6 +3,7 @@
 #   1. many simultaneous "I'll sort this" claims on one item  -> exactly one wins
 #   2. many simultaneous "choose this option" decisions       -> exactly one option ends up selected
 #   3. many simultaneous preference inserts by one member     -> exactly one preference
+#   4. Phase 7: simultaneous adds of one essential, claims of it, and restocks of it
 # Uses throwaway users and a throwaway household, and removes them afterwards.
 #
 #   FLATQUEST_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres supabase/tests/coordinator_race.sh
@@ -85,5 +86,26 @@ pref_gen() { echo "$A|insert into public.product_preferences (item_id, household
 pref_ok="$(run_parallel pref 8 pref_gen)"
 check "8 simultaneous preferences by one member: exactly one succeeds" 1 "$pref_ok"
 check "8 simultaneous preferences by one member: exactly one row" 1 "$(P -c "select count(*) from public.product_preferences where item_id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'")"
+
+# ---- Phase 7: essentials
+ess_add_gen() { if [ $(( $1 % 2 )) -eq 0 ]; then u=$A; else u=$B; fi
+  echo "$u|insert into public.essentials (household_id, name) values ('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'Race soap')"; }
+added="$(run_parallel essadd 12 ess_add_gen)"
+check "12 simultaneous adds of the same essential: exactly one succeeds" 1 "$added"
+check "12 simultaneous adds: one essential row" 1 "$(P -c "select count(*) from public.essentials where household_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'")"
+ESS="$(P -c "select id from public.essentials where household_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'")"
+
+ess_claim_gen() { if [ $(( $1 % 2 )) -eq 0 ]; then u=$A; else u=$B; fi
+  echo "$u|perform public.update_essential('$ESS', 'claim', 'needed')"; }
+claimed="$(run_parallel essclaim 12 ess_claim_gen)"
+# The winner's own repeat taps are harmless; every attempt by the other person is refused.
+check "12 simultaneous claims (two people): only the winner's 6 taps succeed" 6 "$claimed"
+check "12 simultaneous claims: exactly one person is getting it" 1 "$(P -c "select count(*) from public.essentials where id = '$ESS' and status = 'getting' and claimed_by is not null")"
+
+ess_restock_gen() { if [ $(( $1 % 2 )) -eq 0 ]; then u=$A; else u=$B; fi
+  echo "$u|perform public.update_essential('$ESS', 'restock')"; }
+restocked="$(run_parallel essrestock 10 ess_restock_gen)"
+check "10 simultaneous restocks: none fails" 10 "$restocked"
+check "10 simultaneous restocks: exactly one restock recorded" 1 "$(P -c "select count(*) from public.essential_restocks where essential_id = '$ESS'")"
 
 exit $fail
