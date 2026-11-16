@@ -85,8 +85,10 @@ export function EssentialItem({ essential, onOpen }: { essential: EssentialRow; 
           <span className={`block truncate text-[17px] font-semibold ${stocked ? 'text-ink-2' : ''}`}>{essential.name}</span>
           <span className="text-ink-2 flex items-center gap-1.5 truncate text-[14px]">
             {essential.status === 'getting' && claimer && <Avatar profile={claimer.profile} size={18} decorative />}
-            <span className="truncate">{meta}</span>
-            {details ? <span className="truncate" data-testid="essential-details">· {details}</span> : null}
+            {/* One line that truncates once: "Needed" is implied in the To-get list when there are details. */}
+            <span className="truncate" data-testid="essential-meta">
+              {essential.status === 'needed' && details ? details : details ? `${meta} · ${details}` : meta}
+            </span>
           </span>
         </button>
         {stocked ? (

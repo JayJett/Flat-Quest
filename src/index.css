@@ -144,6 +144,13 @@
     border-color: var(--color-danger);
   }
 
+  /* Search fields use our own clear button; hide the browser's duplicate. */
+  input[type='search']::-webkit-search-cancel-button,
+  input[type='search']::-webkit-search-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
   .no-scrollbar {
     scrollbar-width: none;
   }

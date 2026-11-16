@@ -146,6 +146,21 @@ await sleep(1000)
 pass(p7.aPrefs.length === 0, 'a flatmate never receives someone else’s preferences')
 pass(p7.cLiving.length === 0, 'outsiders receive no essentials or tasks')
 
+// 4c. Phase 8: a muted category creates nothing for that person, live; search sources stay private.
+ok(await B.from('user_preferences').upsert({ muted_notifications: ['assignments'] }, { onConflict: 'user_id' }), 'mute')
+const beforeMute = seen.b.length
+const muted = ok(await A.from('household_tasks').insert({ household_id: hid, title: 'Muted assignment', assignee_id: blair.id }).select().single(), 'muted task')
+await waitFor(() => p7.bTask.some((p) => p.new?.id === muted.id), 'muted task sync')
+await sleep(1500)
+pass(!seen.b.slice(beforeMute).some((p) => p.eventType === 'INSERT'), 'a muted category creates no notification for that person (server-side)')
+const stillThere = (await B.from('notifications').select('id').eq('recipient_id', blair.id)).data ?? []
+pass(stillThere.length > 0, 'earlier notifications are still there after muting')
+const peekIdeas = await C.from('wishlist_items').select('id').eq('household_id', hid)
+const peekVisuals = await C.from('room_visuals').select('id').eq('household_id', hid)
+const peekTasks = await C.from('household_tasks').select('id').ilike('title', '%')
+pass((peekIdeas.data ?? []).length === 0 && (peekVisuals.data ?? []).length === 0 && !(peekTasks.data ?? []).some((t) => t.id === muted.id),
+  'search sources from another flat are invisible to an outsider')
+
 // 5. Removal takes effect immediately, including for the removed person's open session.
 ok(await A.rpc('remove_household_member', { p_household: hid, p_user: blair.id }), 'remove')
 await waitFor(() => seen.bMembers.some((p) => p.old?.user_id === blair.id), 'membership delete event')
