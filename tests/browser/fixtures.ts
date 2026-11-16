@@ -57,10 +57,10 @@ export async function mockFlat(page: Page, tour = false, opts: { flatmates?: boo
   page.on('pageerror', (e) => console.log('BROWSER ERROR', e.message))
   const profile = { id: uid, display_name: 'Alex', avatar_path: null, accent_color: '#3657e8', icon: 'user', preferences: {}, tour_completed_at: tour ? null : now, created_at: now, updated_at: now }
   const madiProfile = { ...profile, id: madi, display_name: 'Madi', accent_color: '#f0478c', tour_completed_at: now }
-  const room = { id: rid, household_id: hid, name: 'Kitchen', icon: 'cooking-pot', color: 'green', sort_order: 0, import_key: null, width_cm: null as number | null, length_cm: null as number | null, height_cm: null as number | null, measurement_notes: null as string | null, created_at: now, updated_at: now }
+  const room = { id: rid, household_id: hid, name: 'Kitchen', icon: 'cooking-pot', color: 'green', sort_order: 0, import_key: null, width_cm: null as number | null, length_cm: null as number | null, height_cm: null as number | null, measurement_notes: null as string | null, description: null as string | null, cover_visual_id: null as string | null, created_at: now, updated_at: now }
   const items = Array.from({ length: 4 }, (_, i) => ({ id: itemId(i), household_id: hid, room_id: rid, name: ['Kettle', 'Fridge', 'Toaster', 'Plates'][i], description: null, priority: 'must_have', status: i === 1 ? 'provided' : 'to_decide', ownership: 'to_decide', owner_user_id: null, is_complete: false, completed_at: null as string | null, completed_by: null as string | null, estimated_price: null, actual_price: null as number | null, shopping_url: null, notes: null, sort_order: i, import_key: null, needs_assignees: false, created_by: uid, created_at: now, updated_at: now }))
   const state = {
-    items, room, failSave: false, conflict: false, failAssign: false, writes: 0, creates: 0,
+    items, room, roomPatches: [] as Record<string, unknown>[], failRoomSave: false, failSave: false, conflict: false, failAssign: false, writes: 0, creates: 0,
     assignments: [] as { item_id: string; household_id: string; user_id: string; created_at: string }[],
     // Phase 4
     options: [] as OptionRow[], preferences: [] as PreferenceRow[], coordinators: [] as CoordinatorRow[], purchases: [] as PurchaseRow[],
@@ -159,7 +159,11 @@ export async function mockFlat(page: Page, tour = false, opts: { flatmates?: boo
     }
     if (table === 'households') return send({ id: hid, name: 'Our Flat', address: null, created_by: uid, settings: {}, member_limit: state.memberLimit, photo_path: null, created_at: now, updated_at: now })
     if (table === 'rooms') {
-      if (method === 'PATCH') { Object.assign(room, body, { updated_at: stamp() }); return send(room) }
+      if (method === 'PATCH') {
+        state.roomPatches.push(body)
+        if (state.failRoomSave) return dbError('23514', 'Choose a photo from this room’s Visual Home', 400)
+        Object.assign(room, body, { updated_at: stamp() }); return send(room)
+      }
       return send([room])
     }
     if (table === 'item_assignees') return send(state.assignments)

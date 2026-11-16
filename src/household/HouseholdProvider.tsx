@@ -39,7 +39,7 @@ export type ItemPatch = Partial<
   >
 >
 export type ItemInput = ItemPatch & Pick<Item, 'name' | 'room_id'>
-export type RoomPatch = Partial<Pick<Room, 'name' | 'icon' | 'color' | 'sort_order' | 'width_cm' | 'length_cm' | 'height_cm' | 'measurement_notes'>>
+export type RoomPatch = Partial<Pick<Room, 'name' | 'icon' | 'color' | 'sort_order' | 'width_cm' | 'length_cm' | 'height_cm' | 'measurement_notes' | 'description' | 'cover_visual_id'>>
 export type ProfilePatch = Partial<Pick<Profile, 'display_name' | 'avatar_path' | 'accent_color' | 'icon' | 'tour_completed_at'>>
 
 type Result<T = void> = { ok: true; data: T } | { ok: false; error: string }

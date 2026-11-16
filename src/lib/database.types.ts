@@ -68,6 +68,10 @@ export type RoomRow = {
   length_cm: number | null
   height_cm: number | null
   measurement_notes: string | null
+  /** Phase 9: a short shared description (≤120 characters). */
+  description: string | null
+  /** Phase 9: one of this room's own Visual Home images, shown as its cover. */
+  cover_visual_id: string | null
   created_at: string
   updated_at: string
 }
