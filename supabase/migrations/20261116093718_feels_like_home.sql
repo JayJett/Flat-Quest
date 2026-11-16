@@ -2,7 +2,7 @@
 --
 -- Additive. Existing rooms keep their name, icon, colour and order; both new columns start
 -- empty. No reminder history is changed. Recovery:
--- supabase/rollback/20261116100001_feels_like_home_down.sql.
+-- supabase/rollback/20261116093718_feels_like_home_down.sql.
 
 -- ───────────────────────── 1. Room personality ─────────────────────────
 -- A short shared description, and an optional cover chosen from the room's own Visual Home

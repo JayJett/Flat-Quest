@@ -1,4 +1,4 @@
--- EMERGENCY ONLY. Reverses 20261116100001_feels_like_home.sql.
+-- EMERGENCY ONLY. Reverses 20261116093718_feels_like_home.sql.
 -- Removes room covers and descriptions (the photos themselves stay in Visual Home) and restores
 -- the Phase 8 reminder function. Redeploy the previous app version first.
 begin;
