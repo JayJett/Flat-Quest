@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { hid, madi, makeEssential, mockFlat, resync, rid, uid } from './fixtures'
+import { hid, madi, makeEssential, makeTask, mockFlat, resync, rid, uid } from './fixtures'
 
 type State = Awaited<ReturnType<typeof mockFlat>>
 const at = '2026-11-12T00:00:00.000Z'
@@ -196,4 +196,16 @@ test.describe('polish', () => {
     expect(manifest).toMatchObject({ id: './', lang: 'en-NZ', display: 'standalone', start_url: './', scope: './' })
     expect(manifest.shortcuts.map((s: { url: string }) => s.url)).toEqual(['./essentials', './tasks', './rooms'])
   })
+})
+
+test('a new screen opens at the top with its own title, even from far down Home', async ({ page }) => {
+  const state = await mockFlat(page, false, { flatmates: true })
+  state.tasks.push(...Array.from({ length: 6 }, (_, i) => makeTask({ title: `Job ${i + 1}` })))
+  await page.goto('./')
+  await page.getByRole('link', { name: 'View all activity' }).scrollIntoViewIfNeeded()
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(100)
+  await page.getByRole('link', { name: 'View all activity' }).click()
+  await expect(page).toHaveURL(/\/activity$/)
+  await expect(page.getByRole('heading', { name: 'Activity', level: 1 })).toHaveCount(1)
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
 })

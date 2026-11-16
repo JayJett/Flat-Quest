@@ -154,12 +154,15 @@ function Shell() {
   useLayoutEffect(() => {
     entryKey.current = location.key
   }, [location.key])
+  // A new screen starts at the top before anything reads the scroll position, so its header
+  // doesn't briefly think it's scrolled (child effects run before this component's).
+  useLayoutEffect(() => {
+    if (navType !== 'POP' || !positions.current.has(location.key)) window.scrollTo({ top: 0 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname])
   useEffect(() => {
     const saved = navType === 'POP' ? positions.current.get(location.key) : undefined
-    if (saved === undefined) {
-      window.scrollTo({ top: 0 })
-      return
-    }
+    if (saved === undefined) return
     // Lazy screens render a moment later; try for a few frames until the page is tall enough.
     let tries = 0
     let frame = 0
