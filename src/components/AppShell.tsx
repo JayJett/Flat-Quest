@@ -4,6 +4,7 @@ import {
   House,
   LayoutGrid,
   LogOut,
+  Search,
   Settings,
   UserRound,
   Users,
@@ -11,9 +12,9 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { AnimatePresence, motion, type PanInfo } from 'motion/react'
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
+import { NavLink, Outlet, useLocation, useNavigate, useNavigationType } from 'react-router'
 import { useAuth } from '@/auth/AuthProvider'
 import { ProfileIcon } from '@/design/icons'
 import { useHousehold } from '@/household/HouseholdProvider'
@@ -24,6 +25,8 @@ import { useFocusTrap } from './Sheet'
 import { TourProvider, useTour } from './Tour'
 import { useOpenEvent } from '@/activity/useOpenEvent'
 import { LivingProvider } from '@/living/LivingProvider'
+import { SearchOverlay } from '@/search/SearchOverlay'
+import { IconButton } from './ui'
 import { NotificationBell, NotificationDrawer } from '@/notifications/NotificationDrawer'
 import { NotificationProvider, useNotifications, type Notice } from '@/notifications/NotificationProvider'
 
@@ -39,11 +42,13 @@ interface Panels {
   open: () => void
   /** Opens the notification drawer (closing the menu). */
   openNotifications: () => void
+  /** Opens global search (closing anything else). */
+  openSearch: () => void
 }
-const DrawerContext = createContext<Panels>({ open: () => undefined, openNotifications: () => undefined })
+const DrawerContext = createContext<Panels>({ open: () => undefined, openNotifications: () => undefined, openSearch: () => undefined })
 export const useDrawer = () => useContext(DrawerContext)
 
-type PanelState = { panel?: 'notifications' } | null
+type PanelState = { panel?: 'notifications' | 'search' } | null
 
 export function AppShell() {
   return (
@@ -63,27 +68,62 @@ function Shell() {
   const navigate = useNavigate()
   const openEvent = useOpenEvent()
   const { markRead } = useNotifications()
-  // The notification drawer is a history entry, so the browser's Back button (and the
-  // Android back gesture) closes it instead of leaving the page.
-  const notificationsOpen = (location.state as PanelState)?.panel === 'notifications'
+  // The notification drawer and search are history entries, so the browser's Back button
+  // (and the Android back gesture) closes them instead of leaving the page. Only one panel
+  // can be open at a time.
+  const panel = (location.state as PanelState)?.panel ?? null
+  const notificationsOpen = panel === 'notifications'
+  const searchOpen = panel === 'search'
   const pushedPanel = useRef(false)
   const here = `${location.pathname}${location.search}${location.hash}`
-  const openNotifications = () => {
+  const openPanel = (name: 'notifications' | 'search') => {
     setDrawerOpen(false)
-    if (notificationsOpen) return
-    pushedPanel.current = true
-    navigate(here, { state: { panel: 'notifications' } })
+    if (panel === name) return
+    // Switching panels replaces the entry, so one Back always returns to the page.
+    if (panel) navigate(here, { replace: true, state: { panel: name } })
+    else {
+      pushedPanel.current = true
+      navigate(here, { state: { panel: name } })
+    }
   }
-  const closeNotifications = () => {
-    if (!notificationsOpen) return
+  const closePanel = () => {
+    if (!panel) return
     if (pushedPanel.current) navigate(-1)
     else navigate(here, { replace: true, state: null })
     pushedPanel.current = false
   }
+  const openNotifications = () => openPanel('notifications')
+  const openSearch = () => openPanel('search')
+  const closeNotifications = closePanel
   const openMenu = () => {
-    closeNotifications()
+    closePanel()
     setDrawerOpen(true)
   }
+  const openResult = (href: string) => {
+    pushedPanel.current = false
+    // Replace the search entry: Back from the result returns to the page search was opened on.
+    navigate(href, { replace: true })
+  }
+
+  const openSearchRef = useRef(openSearch)
+  useEffect(() => {
+    openSearchRef.current = openSearch
+  })
+
+  // Desktop shortcut: "/" or Ctrl/⌘-K opens search (not while typing in a field).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      const typing = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)
+      if ((e.key === 'k' && (e.metaKey || e.ctrlKey)) || (e.key === '/' && !typing && !e.metaKey && !e.ctrlKey)) {
+        if (document.querySelector('[role="dialog"][aria-modal="true"]') && panel !== 'search') return
+        e.preventDefault()
+        openSearchRef.current()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [panel])
   const openNotice = (notice: Notice) => {
     void markRead(notice.id)
     const wasPushed = pushedPanel.current
@@ -99,15 +139,44 @@ function Shell() {
     if (drawerOpen) setDrawerOpen(false)
   }
 
-  // Scroll to top on route change, like a native push.
+  // Scroll like a native app: a new screen starts at the top; going Back returns you to
+  // where you were on that screen. Positions are remembered per history entry.
+  const navType = useNavigationType()
+  const positions = useRef(new Map<string, number>())
+  const entryKey = useRef(location.key)
   useEffect(() => {
-    window.scrollTo({ top: 0 })
+    const onScroll = () => positions.current.set(entryKey.current, window.scrollY)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+  // Switch the key before paint, so a shorter new page clamping the scroll can't overwrite
+  // the position remembered for the page we just left.
+  useLayoutEffect(() => {
+    entryKey.current = location.key
+  }, [location.key])
+  useEffect(() => {
+    const saved = navType === 'POP' ? positions.current.get(location.key) : undefined
+    if (saved === undefined) {
+      window.scrollTo({ top: 0 })
+      return
+    }
+    // Lazy screens render a moment later; try for a few frames until the page is tall enough.
+    let tries = 0
+    let frame = 0
+    const restore = () => {
+      window.scrollTo({ top: saved })
+      if (Math.abs(window.scrollY - saved) > 2 && ++tries < 20) frame = requestAnimationFrame(restore)
+    }
+    frame = requestAnimationFrame(restore)
+    return () => cancelAnimationFrame(frame)
+    // Only screen changes move the scroll position (opening a panel keeps the path).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname])
 
   return (
     <ShoppingProvider>
     <TourProvider>
-    <DrawerContext.Provider value={{ open: openMenu, openNotifications }}>
+    <DrawerContext.Provider value={{ open: openMenu, openNotifications, openSearch }}>
       <div className="lg:flex" style={{ paddingLeft: 'var(--safe-left)', paddingRight: 'var(--safe-right)' }}>
         <SideRail />
         <main
@@ -119,7 +188,8 @@ function Shell() {
         </main>
       </div>
       <BottomNav />
-      <Drawer open={drawerOpen && !notificationsOpen} onClose={() => setDrawerOpen(false)} />
+      <Drawer open={drawerOpen && !panel} onClose={() => setDrawerOpen(false)} />
+      <SearchOverlay open={searchOpen} onClose={closePanel} onSelect={openResult} />
       <NotificationDrawer open={notificationsOpen} onClose={closeNotifications} onOpenNotice={openNotice} />
     </DrawerContext.Provider>
     </TourProvider>
@@ -185,6 +255,9 @@ export function PageHeader({
         </div>
         <div className="-mr-2 flex items-center gap-1">
           {actions}
+          <IconButton label="Search" onClick={drawer.openSearch} data-testid="search-button" aria-haspopup="dialog" aria-keyshortcuts="/ Control+K Meta+K">
+            <Search size={22} aria-hidden />
+          </IconButton>
           <NotificationBell onOpen={drawer.openNotifications} />
         </div>
       </div>

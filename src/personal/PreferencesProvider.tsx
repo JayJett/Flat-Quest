@@ -10,14 +10,19 @@ export type MotionPref = 'playful' | 'balanced' | 'minimal'
 /** What actually plays: the OS "reduce motion" setting always wins over the app setting. */
 export type MotionLevel = MotionPref | 'reduced'
 
+export const NOTIFICATION_CATEGORIES = ['discussions', 'assignments', 'shopping', 'home', 'reminders', 'milestones'] as const
+export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number]
+
 export interface Preferences {
   accent: AccentKey
   greetingName: string | null
   motion: MotionPref
   layout: HomeLayout
+  /** Notification categories this person has switched off (Phase 8). Empty = everything on. */
+  muted: NotificationCategory[]
 }
 
-export const DEFAULT_PREFERENCES: Preferences = { accent: DEFAULT_ACCENT, greetingName: null, motion: 'balanced', layout: DEFAULT_LAYOUT }
+export const DEFAULT_PREFERENCES: Preferences = { accent: DEFAULT_ACCENT, greetingName: null, motion: 'balanced', layout: DEFAULT_LAYOUT, muted: [] }
 
 interface PreferencesState {
   prefs: Preferences
@@ -25,21 +30,30 @@ interface PreferencesState {
   /** True once the saved preferences have been read from the server. */
   synced: boolean
   update: (patch: Partial<Preferences>) => Promise<boolean>
-  reset: () => Promise<boolean>
+  /** Resets the given settings (all of them when omitted) to their defaults. */
+  reset: (keys?: (keyof Preferences)[]) => Promise<boolean>
 }
 
 const Ctx = createContext<PreferencesState | null>(null)
 const cacheKey = (uid: string) => `flatquest.prefs.${uid}`
 
-function fromRow(row: Pick<UserPreferencesRow, 'accent' | 'greeting_name' | 'motion' | 'home_layout'>): Preferences {
+function fromRow(row: Pick<UserPreferencesRow, 'accent' | 'greeting_name' | 'motion' | 'home_layout'> & { muted_notifications?: string[] | null }): Preferences {
   return {
     accent: row.accent ?? DEFAULT_ACCENT,
     greetingName: row.greeting_name ?? null,
     motion: row.motion ?? 'balanced',
     layout: normaliseLayout(row.home_layout),
+    muted: (row.muted_notifications ?? []).filter((c): c is NotificationCategory => (NOTIFICATION_CATEGORIES as readonly string[]).includes(c)),
   }
 }
-const toRow = (p: Preferences) => ({ accent: p.accent, greeting_name: p.greetingName, motion: p.motion, home_layout: p.layout })
+const toRow = (p: Preferences) => ({
+  accent: p.accent,
+  greeting_name: p.greetingName,
+  motion: p.motion,
+  // Saved without the retired Home sections (normalised on read), never wiped.
+  home_layout: p.layout,
+  muted_notifications: p.muted,
+})
 
 function readCache(uid: string | null): Preferences {
   if (!uid) return DEFAULT_PREFERENCES
@@ -152,7 +166,15 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   )
 
   const update = useCallback((patch: Partial<Preferences>) => save({ ...prefsRef.current, ...patch }), [save])
-  const reset = useCallback(() => save(DEFAULT_PREFERENCES), [save])
+  const reset = useCallback(
+    (keys?: (keyof Preferences)[]) => {
+      if (!keys) return save(DEFAULT_PREFERENCES)
+      const next = { ...prefsRef.current }
+      for (const k of keys) (next as Record<string, unknown>)[k] = DEFAULT_PREFERENCES[k]
+      return save(next)
+    },
+    [save],
+  )
 
   const value = useMemo<PreferencesState>(() => ({ prefs, motion, synced, update, reset }), [prefs, motion, synced, update, reset])
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

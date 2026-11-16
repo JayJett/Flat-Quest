@@ -524,7 +524,7 @@ function PersonToggle({
   )
 }
 
-export function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+export function Switch({ checked, onChange, label, tone = 'green' }: { checked: boolean; onChange: (v: boolean) => void; label: string; tone?: 'green' | 'accent' }) {
   return (
     <button
       type="button"
@@ -535,7 +535,7 @@ export function Switch({ checked, onChange, label }: { checked: boolean; onChang
         e.preventDefault()
         onChange(!checked)
       }}
-      className={`relative inline-flex h-8 w-[52px] shrink-0 items-center rounded-full transition-colors duration-200 ${checked ? 'bg-green' : 'bg-surface-3'}`}
+      className={`relative inline-flex h-8 w-[52px] shrink-0 items-center rounded-full transition-colors duration-200 ${checked ? (tone === 'accent' ? 'bg-accent' : 'bg-green') : 'bg-surface-3'}`}
     >
       <span
         className="bg-surface absolute top-1 left-1 h-6 w-6 rounded-full transition-transform duration-200"

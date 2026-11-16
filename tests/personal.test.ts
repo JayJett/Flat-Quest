@@ -69,7 +69,7 @@ describe('greeting', () => {
 })
 
 const essential = (p: Partial<EssentialRow>): EssentialRow => ({
-  id: p.name ?? 'x', household_id: 'h', name: 'x', name_key: '', category: null, note: null, status: 'needed', claimed_by: null, needed_at: null, needed_by: null,
+  id: p.name ?? 'x', household_id: 'h', name: 'x', name_key: '', category: null, note: null, quantity: null, status: 'needed', claimed_by: null, needed_at: null, needed_by: null,
   restocked_at: null, restocked_by: null, archived_at: null, created_by: null, created_at: '', updated_at: '', ...p,
 })
 

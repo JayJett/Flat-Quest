@@ -108,6 +108,7 @@ export function HomeLayoutSheet({ open, onClose }: { open: boolean; onClose: () 
                 <ArrowDown size={20} aria-hidden />
               </IconButton>
               <Switch
+                tone="accent"
                 checked={!entry.hidden}
                 label={`Show ${s.label}`}
                 onChange={(show) => void update({ layout: layout.map((e) => (e.id === entry.id ? { ...e, hidden: !show } : e)) })}
