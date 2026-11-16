@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { useState, type MouseEvent } from 'react'
+import { useRef, useState, type MouseEvent } from 'react'
 import { useMotionLevel } from '@/personal/PreferencesProvider'
 import { decorative, PRESS_SCALE, SPRINGS } from './motion'
 
@@ -26,18 +26,23 @@ export function TickButton({ checked, label, onToggle, size = 30, tone = 'green'
   const level = useMotionLevel()
   const springs = SPRINGS[level]
   const [busy, setBusy] = useState(false)
+  // A ref, not just state: two taps can land before React re-renders the disabled button.
+  const inFlight = useRef(false)
   const [pop, setPop] = useState(0)
   const fill = tone === 'green' ? 'var(--color-green)' : 'var(--color-accent)'
   const stroke = tone === 'green' ? '#111111' : 'var(--color-on-accent)'
 
   const click = async (e: MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation()
-    if (busy || disabled) return
+    if (inFlight.current || disabled) return
+    inFlight.current = true
     const el = e.currentTarget
     const next = !checked
     setBusy(true)
-    const ok = await onToggle(next, el)
-    setBusy(false)
+    const ok = await onToggle(next, el).finally(() => {
+      inFlight.current = false
+      setBusy(false)
+    })
     if (ok && next) {
       if (level !== 'reduced' && navigator.vibrate) navigator.vibrate(8)
       setPop((p) => p + 1)
