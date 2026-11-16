@@ -51,3 +51,19 @@ export function rowMotion(level: MotionLevel) {
     exit: { opacity: 0, x: level === 'minimal' ? 0 : 24, transition: { duration: 0.18 } },
   }
 }
+
+/** Progress bars glide to their new value; instant when motion is reduced. */
+export const PROGRESS: Record<MotionLevel, Transition> = {
+  playful: { duration: 0.8, ease: [0.22, 1, 0.36, 1] },
+  balanced: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
+  minimal: { duration: 0.3, ease: 'easeOut' },
+  reduced: { duration: 0 },
+}
+
+/** Images (e.g. room covers) fade in once loaded instead of popping. */
+export const IMAGE_FADE: Record<MotionLevel, Transition> = {
+  playful: { duration: 0.35, ease: 'easeOut' },
+  balanced: { duration: 0.35, ease: 'easeOut' },
+  minimal: { duration: 0.2, ease: 'easeOut' },
+  reduced: { duration: 0 },
+}

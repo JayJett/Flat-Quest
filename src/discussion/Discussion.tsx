@@ -465,7 +465,7 @@ function Composer({
             aria-label={submitLabel}
             disabled={!text.trim() || over || sending}
             onClick={() => void submit()}
-            className="pressable bg-accent disabled:bg-accent/40 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-on-accent"
+            className="pressable bg-accent text-on-accent disabled:bg-surface-3 disabled:text-ink-3 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
           >
             <SendHorizontal size={20} aria-hidden />
           </button>

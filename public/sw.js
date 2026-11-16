@@ -1,9 +1,11 @@
 // Deliberately cache only a generic offline page. Never cache household data,
 // tokens, signed photos, API responses or HTML containing an auth callback.
-const CACHE = 'flatquest-offline-v1'
+const CACHE = 'flatquest-offline-v2'
 const FALLBACK = new URL('offline.html', self.registration.scope).href
+// Nothing here can go stale (only the offline page is cached), so a new worker takes over
+// straight away instead of waiting for every tab to close.
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.add(FALLBACK)))
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.add(FALLBACK)).then(() => self.skipWaiting()))
 })
 self.addEventListener('activate', (event) => {
   event.waitUntil(caches.keys().then((keys) => Promise.all(keys

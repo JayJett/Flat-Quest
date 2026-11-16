@@ -1,10 +1,12 @@
-import { Palette } from 'lucide-react'
-import { motion } from 'motion/react'
+import { Check, Palette } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
 import { RoomIcon } from '@/design/icons'
 import { roomColor } from '@/design/tokens'
 import type { Room } from '@/lib/domain'
 import type { Progress } from '@/lib/stats'
+import { PROGRESS, SPRINGS } from '@/motion/motion'
+import { useMotionLevel } from '@/personal/PreferencesProvider'
 import { RoomCoverImage } from './RoomCover'
 import { useRoomCover } from './useRoomCover'
 
@@ -15,6 +17,8 @@ import { useRoomCover } from './useRoomCover'
  */
 export function RoomHeader({ room, progress, onPersonalise }: { room: Room; progress: Progress; onPersonalise: () => void }) {
   const c = roomColor(room.color)
+  const level = useMotionLevel()
+  const done = progress.total > 0 && progress.ready === progress.total
   const cover = useRoomCover(room.cover_visual_id)
   // If the file can't be shown, fall back to the colour layout rather than an empty band.
   const [broken, setBroken] = useState<string | null>(null)
@@ -48,14 +52,24 @@ export function RoomHeader({ room, progress, onPersonalise }: { room: Room; prog
       <div className={`relative px-4 pb-4 sm:p-5 ${withCover ? 'pt-3' : 'pt-[68px] sm:pt-20'}`}>
         <h1 className="text-[26px] leading-[1.05] font-extrabold tracking-[-0.02em] [overflow-wrap:anywhere] min-[380px]:text-[28px] sm:text-[30px]">{room.name}</h1>
         {room.description && <p className="mt-1 line-clamp-2 text-[15px] leading-snug font-medium" style={{ opacity: 0.92 }}>{room.description}</p>}
-        <p className="mt-1.5 text-[17px] font-bold sm:text-[19px]" style={{ opacity: 0.92 }}>{status}</p>
+        <p className="mt-1.5 inline-flex items-center gap-1.5 text-[17px] font-bold sm:text-[19px]" style={{ opacity: 0.92 }}>
+          {/* A quiet acknowledgement when the room is complete; the confetti is reserved for the person who finished it. */}
+          <AnimatePresence initial={false}>
+            {done && (
+              <motion.span key="done" className="inline-flex" initial={{ scale: level === 'reduced' ? 1 : 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} transition={SPRINGS[level].pop}>
+                <Check size={19} strokeWidth={3} aria-hidden />
+              </motion.span>
+            )}
+          </AnimatePresence>
+          {status}
+        </p>
         <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full" style={{ backgroundColor: track }} role="progressbar" aria-label={`${room.name} progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress.ratio * 100)}>
           <motion.div
             className="h-full rounded-full"
             style={{ backgroundColor: c.on }}
             initial={false}
             animate={{ width: `${progress.ratio * 100}%` }}
-            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            transition={PROGRESS[level]}
           />
         </div>
       </div>

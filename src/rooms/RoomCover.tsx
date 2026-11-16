@@ -1,6 +1,8 @@
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import { useSignedUrl } from '@/components/Avatar'
+import { IMAGE_FADE } from '@/motion/motion'
+import { useMotionLevel } from '@/personal/PreferencesProvider'
 import type { CoverImage } from './useRoomCover'
 
 /**
@@ -12,6 +14,7 @@ export function RoomCoverImage({ cover, size = 'thumb', className = '', onState 
 }) {
   const path = cover ? (size === 'full' ? (cover.photo ?? cover.thumb) : (cover.thumb ?? cover.photo)) : null
   const url = useSignedUrl('household-media', path)
+  const level = useMotionLevel()
   const [loaded, setLoaded] = useState<string | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
   if (!url || failed === url) return null
@@ -24,7 +27,7 @@ export function RoomCoverImage({ cover, size = 'thumb', className = '', onState 
       className={`h-full w-full object-cover ${className}`}
       initial={false}
       animate={{ opacity: loaded === url ? 1 : 0 }}
-      transition={{ duration: 0.35, ease: 'easeOut' }}
+      transition={IMAGE_FADE[level]}
       onLoad={() => { setLoaded(url); onState?.(true) }}
       onError={() => { setFailed(url); onState?.(false) }}
     />

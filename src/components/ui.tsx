@@ -1,12 +1,14 @@
 import { LoaderCircle } from 'lucide-react'
 import { motion, useReducedMotion, useSpring, useTransform } from 'motion/react'
+import { PROGRESS } from '@/motion/motion'
+import { useMotionLevel } from '@/personal/PreferencesProvider'
 import { forwardRef, useEffect, useId, type ButtonHTMLAttributes, type ReactNode } from 'react'
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'ink'
 
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-accent text-on-accent active:bg-accent-press disabled:bg-accent/40',
-  ink: 'bg-ink text-white disabled:bg-ink/40',
+  primary: 'bg-accent text-on-accent active:bg-accent-press disabled:bg-surface-3 disabled:text-ink-3',
+  ink: 'bg-ink text-white disabled:bg-surface-3 disabled:text-ink-3',
   secondary: 'bg-surface-2 text-ink active:bg-surface-3 disabled:text-ink-3',
   ghost: 'bg-transparent text-ink active:bg-surface-2 disabled:text-ink-3',
   danger: 'bg-danger-soft text-danger active:bg-[#fadcdc] disabled:opacity-50',
@@ -72,6 +74,27 @@ export function Spinner({ label = 'Loading', size = 24 }: { label?: string; size
   )
 }
 
+/**
+ * Quiet placeholder rows shaped like the list that's loading, so nothing jumps when data
+ * arrives. Static (no shimmer), announced once to screen readers.
+ */
+export function SkeletonRows({ label, rows = 3, compact = false }: { label: string; rows?: number; compact?: boolean }) {
+  return (
+    <div role="status" aria-label={label} data-testid="skeleton" className={compact ? 'py-1' : 'py-2'}>
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className={`flex items-center gap-3 ${compact ? 'min-h-11' : 'min-h-16'}`} aria-hidden>
+          <span className="skeleton h-7 w-7 shrink-0 !rounded-full" />
+          <span className="flex flex-1 flex-col gap-2">
+            <span className="skeleton h-3.5" style={{ width: `${[62, 48, 70, 54][i % 4]}%` }} />
+            {!compact && <span className="skeleton h-3" style={{ width: `${[34, 40, 28, 36][i % 4]}%` }} />}
+          </span>
+        </div>
+      ))}
+      <span className="sr-only">{label}</span>
+    </div>
+  )
+}
+
 export function ProgressBar({
   value,
   color = 'var(--color-ink)',
@@ -86,6 +109,7 @@ export function ProgressBar({
   label?: string
 }) {
   const pct = Math.max(0, Math.min(1, value)) * 100
+  const level = useMotionLevel()
   return (
     <div
       className="w-full overflow-hidden rounded-full"
@@ -101,7 +125,7 @@ export function ProgressBar({
         style={{ background: color }}
         initial={false}
         animate={{ width: `${pct}%` }}
-        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        transition={PROGRESS[level]}
       />
     </div>
   )

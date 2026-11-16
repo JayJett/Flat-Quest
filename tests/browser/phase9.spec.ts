@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { hid, madi, mockFlat, resync, rid, uid } from './fixtures'
+import { hid, madi, makeEssential, mockFlat, resync, rid, uid } from './fixtures'
 
 type State = Awaited<ReturnType<typeof mockFlat>>
 const at = '2026-11-12T00:00:00.000Z'
@@ -144,5 +144,56 @@ test.describe('room screen polish', () => {
     expect(Math.abs(filter!.y + filter!.height / 2 - (sort!.y + sort!.height / 2))).toBeLessThan(4)
     await page.getByLabel(/Sort items/).selectOption('name')
     await expect(page.getByLabel('Sort items (now by name)')).toBeVisible()
+  })
+})
+
+test.describe('polish', () => {
+  test('disabled primary buttons are neutral grey, not a washed-out accent', async ({ page }) => {
+    const state = await mockFlat(page)
+    for (const accent of ['blue', 'lavender', 'mint', 'coral', 'sunshine']) {
+      state.prefs = { accent, greeting_name: null, motion: 'balanced', home_layout: [] }
+      await page.goto('./essentials')
+      const add = page.getByRole('button', { name: 'Add essential' })
+      await expect(add).toBeDisabled()
+      const colours = await add.evaluate((el) => { const s = getComputedStyle(el); return [s.backgroundColor, s.color] })
+      expect(colours, accent).toEqual(['rgb(236, 236, 239)', 'rgb(163, 163, 168)'])
+    }
+  })
+
+  test('essential suggestions never flash chips for things already on the list', async ({ page }) => {
+    const state = await mockFlat(page)
+    state.essentials.push(makeEssential({ name: 'Toilet paper' }))
+    let release!: () => void
+    const gate = new Promise<void>((r) => { release = r })
+    await page.route('**/rest/v1/essentials*', async (route) => { await gate; await route.fallback() })
+    await page.goto('./essentials')
+    await expect(page.getByTestId('essential-quick-add')).toBeVisible()
+    await expect(page.getByRole('list', { name: 'Common essentials' })).toHaveCount(0)
+    await expect(page.getByTestId('skeleton')).toBeVisible()
+    release()
+    const chips = page.getByRole('list', { name: 'Common essentials' })
+    await expect(chips).toBeVisible()
+    await expect(chips.getByRole('button', { name: 'Toilet paper' })).toHaveCount(0)
+  })
+
+  test('five accent swatches share one row on a small phone', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 568 })
+    await mockFlat(page)
+    await page.goto('./settings')
+    const swatches = page.getByRole('radiogroup', { name: 'Accent colour' }).getByRole('radio')
+    await expect(swatches).toHaveCount(5)
+    const tops = await swatches.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)))
+    expect(tops).toHaveLength(5)
+    expect(new Set(tops).size).toBe(1)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
+  })
+
+  test('no install pop-ups; the manifest has an identity and shortcuts', async ({ page, request }) => {
+    await mockFlat(page)
+    await page.goto('./settings')
+    await expect(page.getByTestId('install-hint')).toHaveCount(0)
+    const manifest = await (await request.get('./manifest.webmanifest')).json()
+    expect(manifest).toMatchObject({ id: './', lang: 'en-NZ', display: 'standalone', start_url: './', scope: './' })
+    expect(manifest.shortcuts.map((s: { url: string }) => s.url)).toEqual(['./essentials', './tasks', './rooms'])
   })
 })

@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router'
 import { useAuth } from '@/auth/AuthProvider'
 import { PageHeader } from '@/components/AppShell'
 import { useToast } from '@/components/Toast'
-import { AnimatedNumber, ErrorPanel, Segmented, Spinner } from '@/components/ui'
+import { AnimatedNumber, ErrorPanel, Segmented, Spinner, SkeletonRows } from '@/components/ui'
 import type { TaskRow } from '@/lib/database.types'
 import { sortTasks, TASK_GROUP_LABEL, taskGroup, type TaskGroup } from '@/living/living'
 import { useLiving } from '@/living/LivingProvider'
@@ -137,9 +137,7 @@ export function TasksPage() {
             )}
           </motion.div>
         ) : status === 'loading' && tasks.length === 0 ? (
-          <div className="py-10 text-center">
-            <Spinner label="Loading tasks" />
-          </div>
+          <SkeletonRows label="Loading tasks" />
         ) : status === 'error' ? (
           <ErrorPanel message={error ?? 'Couldn’t load tasks.'} onRetry={() => void reload()} />
         ) : (
