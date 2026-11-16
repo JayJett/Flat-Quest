@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, RotateCcw } from 'lucide-react'
+import { ArrowDown, ArrowUp, Lock, RotateCcw } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import { ItemSheet, Switch } from '@/components/ItemSheet'
@@ -7,7 +7,7 @@ import { Button, IconButton, Segmented } from '@/components/ui'
 import { useHousehold } from '@/household/HouseholdProvider'
 import { SPRINGS } from '@/motion/motion'
 import { usePreferences } from '@/personal/PreferencesProvider'
-import { DEFAULT_LAYOUT, HOME_SECTIONS, moveSection } from '@/personal/themes'
+import { DEFAULT_LAYOUT, FIXED_HOME_SECTION, HOME_SECTIONS, moveSection } from '@/personal/themes'
 import { EssentialQuickAdd } from './EssentialParts'
 import { TaskQuickAdd } from './TaskParts'
 
@@ -77,6 +77,16 @@ export function HomeLayoutSheet({ open, onClose }: { open: boolean; onClose: () 
   return (
     <Sheet open={open} onClose={onClose} title="Customise Home">
       <p className="text-ink-2 -mt-1 mb-3 text-[15px]">Choose what you see on Home, and in what order. Only you see this.</p>
+      <div className="bg-surface-2 flex min-h-16 items-center gap-3 rounded-2xl px-3 py-2" data-testid="home-layout-fixed">
+        <span className="bg-surface text-ink-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full">
+          <Lock size={16} aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">{FIXED_HOME_SECTION.label}</p>
+          <p className="text-ink-2 text-[13px]">Always first on Home, and always shown.</p>
+        </div>
+      </div>
+      <p className="text-ink-2 mt-4 mb-1 text-[13px] font-bold">Then, in this order</p>
       <ul data-testid="home-layout-list">
         {layout.map((entry, i) => {
           const s = label(entry.id)

@@ -55,13 +55,21 @@ export function applyAccent(key: string | null | undefined, root: HTMLElement = 
 
 // ----------------------------------------------------------------- Home layout
 
+/**
+ * Home always opens with Furnishing progress. It is fixed: never hidden, never moved, and
+ * not part of anyone's saved layout.
+ */
+export const FIXED_HOME_SECTION = { id: 'progress', label: 'Furnishing progress', hint: 'Always first on Home' } as const
+
+/**
+ * The sections each person can reorder and hide (Phase 8: "Room by room" was removed from
+ * Home — the Rooms tab already lists every room).
+ */
 export const HOME_SECTIONS = [
   { id: 'focus', label: 'For you', hint: 'Your tasks, pick-ups and items' },
   { id: 'tasks', label: 'Things to do', hint: 'Household tasks that need attention' },
   { id: 'essentials', label: 'Essentials', hint: 'What the flat is running low on' },
   { id: 'deliveries', label: 'On the way', hint: 'Furniture that’s been ordered' },
-  { id: 'progress', label: 'Furnishing progress', hint: 'How the flat is coming together' },
-  { id: 'rooms', label: 'Room by room', hint: 'Each room’s progress' },
   { id: 'activity', label: 'Around the flat', hint: 'Recent household activity' },
 ] as const
 
@@ -73,6 +81,10 @@ export const DEFAULT_LAYOUT: HomeLayout = HOME_SECTIONS.map((s) => ({ id: s.id, 
 /**
  * Reads a stored layout defensively: unknown ids are dropped, duplicates removed, and any
  * section added in a later release is appended (visible) so nobody silently loses it.
+ *
+ * Phase 7 layouts may contain "progress" (now fixed first) and "rooms" (removed from Home).
+ * Both are simply dropped here, so every other section keeps its saved order and visibility
+ * and nothing needs resetting. This runs on every read, on every device.
  */
 export function normaliseLayout(raw: unknown): HomeLayout {
   const known = new Set<string>(HOME_SECTIONS.map((s) => s.id))
