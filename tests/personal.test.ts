@@ -22,11 +22,33 @@ describe('home layout', () => {
     expect(DEFAULT_LAYOUT.every((s) => !s.hidden)).toBe(true)
   })
   it('reads stored layouts defensively and appends new sections', () => {
-    const out = normaliseLayout([{ id: 'rooms', hidden: true }, { id: 'nope' }, { id: 'rooms' }, 'junk', { id: 'tasks' }])
-    expect(out[0]).toEqual({ id: 'rooms', hidden: true })
+    const out = normaliseLayout([{ id: 'essentials', hidden: true }, { id: 'nope' }, { id: 'essentials' }, 'junk', { id: 'tasks' }])
+    expect(out[0]).toEqual({ id: 'essentials', hidden: true })
     expect(out[1]).toEqual({ id: 'tasks', hidden: false })
     expect(out.map((s) => s.id).sort()).toEqual(HOME_SECTIONS.map((s) => s.id).sort())
     expect(normaliseLayout(null)).toEqual(DEFAULT_LAYOUT)
+  })
+  it('Phase 8: migrates Phase 7 layouts — progress becomes fixed, Room by room disappears, everything else is kept', () => {
+    const phase7 = [
+      { id: 'activity', hidden: false },
+      { id: 'rooms', hidden: false },
+      { id: 'progress', hidden: true },
+      { id: 'essentials', hidden: true },
+      { id: 'focus', hidden: false },
+      { id: 'tasks', hidden: false },
+      { id: 'deliveries', hidden: true },
+    ]
+    expect(normaliseLayout(phase7)).toEqual([
+      { id: 'activity', hidden: false },
+      { id: 'essentials', hidden: true },
+      { id: 'focus', hidden: false },
+      { id: 'tasks', hidden: false },
+      { id: 'deliveries', hidden: true },
+    ])
+  })
+  it('Phase 8: the default order is For you, Things to do, Essentials, On the way, Around the flat', () => {
+    expect(DEFAULT_LAYOUT.map((s) => s.id)).toEqual(['focus', 'tasks', 'essentials', 'deliveries', 'activity'])
+    expect(HOME_SECTIONS.some((s) => (s.id as string) === 'rooms' || (s.id as string) === 'progress')).toBe(false)
   })
   it('moves sections one step and never off the ends', () => {
     expect(moveSection(DEFAULT_LAYOUT, 0, -1)).toBe(DEFAULT_LAYOUT)
@@ -47,7 +69,7 @@ describe('greeting', () => {
 })
 
 const essential = (p: Partial<EssentialRow>): EssentialRow => ({
-  id: p.name ?? 'x', household_id: 'h', name: 'x', name_key: '', category: null, note: null, status: 'needed', claimed_by: null, needed_at: null, needed_by: null,
+  id: p.name ?? 'x', household_id: 'h', name: 'x', name_key: '', category: null, note: null, quantity: null, status: 'needed', claimed_by: null, needed_at: null, needed_by: null,
   restocked_at: null, restocked_by: null, archived_at: null, created_by: null, created_at: '', updated_at: '', ...p,
 })
 

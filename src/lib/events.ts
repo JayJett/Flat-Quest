@@ -1,4 +1,5 @@
 import type { HouseholdEventRow } from './database.types'
+import { daysBetween, formatDay, todayLocal } from './dates'
 
 /**
  * One wording for every household event, shared by the notification drawer and the
@@ -22,6 +23,7 @@ export type EventKind =
   | 'history'
   | 'essential'
   | 'task'
+  | 'reminder'
 
 export interface EventLookup {
   /** Current name for a member (falls back to the name stored with the event). */
@@ -137,6 +139,13 @@ export function describeEvent(e: HouseholdEventRow, look: EventLookup, reason?: 
       return out('task', A, t(' took you off '), { text: str(d.task) ?? 'a task', strong: true })
     case 'task_completed':
       return out('task', A, t(' finished '), { text: str(d.task) ?? 'a task', strong: true })
+    // Reminders come from the flat, not a person, and are worded as a friendly nudge.
+    case 'task_reminder':
+      return num(d.stage) === 2
+        ? out('reminder', t('Still on your list: '), { text: str(d.task) ?? 'a task', strong: true }, t('. Need a hand, or a new date?'))
+        : out('reminder', t('Friendly nudge: '), { text: str(d.task) ?? 'your task', strong: true }, t(' was due ' + dueWords(str(d.due)) + '.'))
+    case 'essential_reminder':
+      return out('reminder', { text: str(d.essential) ?? 'Something', strong: true }, t(` has been on the list for ${num(d.days) ?? 3} days. Still need it?`))
     case 'item_added':
       return count > 1 ? out('item', A, t(` added ${count} items to `), R) : out('item', A, t(' added '), I, t(' to '), R)
     case 'item_completed':
@@ -186,6 +195,14 @@ export function describeEvent(e: HouseholdEventRow, look: EventLookup, reason?: 
     default:
       return out('history', A, t(' made a change'))
   }
+}
+
+/** "yesterday" or "on 12 Nov", from a calendar date. */
+function dueWords(day: string | null): string {
+  if (!day) return 'recently'
+  const diff = daysBetween(day, todayLocal())
+  if (diff === 1) return 'yesterday'
+  return `on ${formatDay(day)}`
 }
 
 /** "Assemble the TV cabinet" → "assemble the TV cabinet" (keeps acronyms like "TV"). */

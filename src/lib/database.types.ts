@@ -257,6 +257,8 @@ export type EssentialRow = {
   name_key: string
   category: 'kitchen' | 'bathroom' | 'laundry' | 'cleaning' | 'other' | null
   note: string | null
+  /** Phase 8: optional usual amount, e.g. "24-roll pack". */
+  quantity: string | null
   status: EssentialStatus
   claimed_by: string | null
   needed_at: string | null
@@ -307,6 +309,8 @@ export type UserPreferencesRow = {
   greeting_name: string | null
   motion: 'playful' | 'balanced' | 'minimal'
   home_layout: Json
+  /** Phase 8 */
+  muted_notifications: string[]
   updated_at: string
 }
 

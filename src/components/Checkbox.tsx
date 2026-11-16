@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 interface CompleteToggleProps {
   checked: boolean
@@ -16,15 +16,20 @@ interface CompleteToggleProps {
 export function CompleteToggle({ checked, label, onToggle, size = 30 }: CompleteToggleProps) {
   const [burst, setBurst] = useState(0)
   const [busy, setBusy] = useState(false)
+  // Guards against a fast double tap landing before the disabled state re-renders.
+  const inFlight = useRef(false)
   const reduce = useReducedMotion()
 
   const click = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (busy) return
+    if (inFlight.current) return
+    inFlight.current = true
     const next = !checked
     setBusy(true)
-    const ok = await onToggle(next)
-    setBusy(false)
+    const ok = await onToggle(next).finally(() => {
+      inFlight.current = false
+      setBusy(false)
+    })
     if (ok && next) {
       if (!reduce && navigator.vibrate) navigator.vibrate(8)
       setBurst((b) => b + 1)

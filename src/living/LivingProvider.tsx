@@ -19,9 +19,11 @@ interface LivingState {
   /** Adds, or reactivates the existing one with the same name (never a duplicate). */
   addEssential: (name: string, extra?: { category?: EssentialCategory | null; note?: string | null }) => Promise<Result<{ essential: EssentialRow; reused: 'new' | 'needed-again' | 'already-on-list' }>>
   actOnEssential: (id: string, action: EssentialAction, opts?: { to?: string }) => Promise<Result<EssentialRow>>
-  editEssential: (id: string, patch: Partial<Pick<EssentialRow, 'name' | 'category' | 'note' | 'archived_at'>>) => Promise<Result<EssentialRow>>
+  editEssential: (id: string, patch: Partial<Pick<EssentialRow, 'name' | 'category' | 'note' | 'quantity' | 'archived_at'>>) => Promise<Result<EssentialRow>>
   addTask: (input: TaskInput) => Promise<Result<TaskRow>>
   updateTask: (id: string, patch: TaskPatch) => Promise<Result<TaskRow>>
+  /** Loads archived tasks (kept out of the everyday load) for the archive view. */
+  loadArchivedTasks: () => Promise<Result>
 }
 
 const Ctx = createContext<LivingState | null>(null)
@@ -230,9 +232,27 @@ export function LivingProvider({ children }: { children: ReactNode }) {
     return { ok: true, data }
   }, [load])
 
+  const loadArchivedTasks = useCallback<LivingState['loadArchivedTasks']>(async () => {
+    if (!hid) return { ok: false, error: 'No flat' }
+    const { data, error: err } = await supabase
+      .from('household_tasks')
+      .select('*')
+      .eq('household_id', hid)
+      .not('archived_at', 'is', null)
+      .order('archived_at', { ascending: false })
+      .limit(200)
+    if (err) return { ok: false, error: errorMessage(err, 'Couldn’t load archived tasks.') }
+    setTasks((prev) => {
+      const have = new Map(prev.map((t) => [t.id, t]))
+      for (const row of data ?? []) if (!pending.current.has(row.id)) have.set(row.id, row)
+      return [...have.values()]
+    })
+    return { ok: true, data: undefined }
+  }, [hid])
+
   const value = useMemo<LivingState>(
-    () => ({ status, error, essentials, tasks, reload: load, addEssential, actOnEssential, editEssential, addTask, updateTask }),
-    [status, error, essentials, tasks, load, addEssential, actOnEssential, editEssential, addTask, updateTask],
+    () => ({ status, error, essentials, tasks, reload: load, addEssential, actOnEssential, editEssential, addTask, updateTask, loadArchivedTasks }),
+    [status, error, essentials, tasks, load, addEssential, actOnEssential, editEssential, addTask, updateTask, loadArchivedTasks],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

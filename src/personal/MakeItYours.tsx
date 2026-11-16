@@ -123,7 +123,7 @@ export function MakeItYours() {
         <span className="text-ink-2 text-[14px] font-medium">{prefs.layout.filter((s) => !s.hidden).length} sections</span>
       </button>
 
-      <Button variant="ghost" className="text-ink-2 mt-3 -ml-2" icon={<RotateCcw size={18} aria-hidden />} onClick={() => void reset()}>
+      <Button variant="ghost" className="text-ink-2 mt-3 -ml-2" icon={<RotateCcw size={18} aria-hidden />} onClick={() => void reset(['accent', 'greetingName', 'motion', 'layout'])}>
         Reset to defaults
       </Button>
       <HomeLayoutSheet open={layoutOpen} onClose={() => setLayoutOpen(false)} />

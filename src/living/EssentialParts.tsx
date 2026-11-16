@@ -71,7 +71,9 @@ export function EssentialItem({ essential, onOpen }: { essential: EssentialRow; 
       ? essential.claimed_by === me
         ? 'You’re getting it'
         : `${claimer?.profile.display_name ?? 'A flatmate'}’s getting it`
-      : essential.note || 'Needed'
+      : 'Needed'
+  // Optional details ("24-roll pack", "the unscented one") ride along quietly.
+  const details = [essential.quantity, essential.note].filter(Boolean).join(' · ')
 
   return (
     <motion.li layout={level !== 'reduced'} {...rowMotion(level)} transition={SPRINGS[level].settle} data-testid="essential-row" data-status={essential.status}>
@@ -83,14 +85,22 @@ export function EssentialItem({ essential, onOpen }: { essential: EssentialRow; 
           <span className={`block truncate text-[17px] font-semibold ${stocked ? 'text-ink-2' : ''}`}>{essential.name}</span>
           <span className="text-ink-2 flex items-center gap-1.5 truncate text-[14px]">
             {essential.status === 'getting' && claimer && <Avatar profile={claimer.profile} size={18} decorative />}
-            <span className="truncate">{meta}</span>
-            {stocked && essential.note ? <span className="truncate">· {essential.note}</span> : null}
+            {/* One line that truncates once: "Needed" is implied in the To-get list when there are details. */}
+            <span className="truncate" data-testid="essential-meta">
+              {essential.status === 'needed' && details ? details : details ? `${meta} · ${details}` : meta}
+            </span>
           </span>
         </button>
         {stocked ? (
-          <Button variant="secondary" size="sm" loading={working} icon={<RotateCcw size={16} aria-hidden />} onClick={() => void act('need')} aria-label={`Need ${essential.name} again`}>
-            Need again
-          </Button>
+          essential.archived_at ? (
+            <Button variant="secondary" size="sm" loading={working} icon={<ArchiveRestore size={16} aria-hidden />} onClick={() => void act('need')} aria-label={`Restore ${essential.name}`}>
+              Restore
+            </Button>
+          ) : (
+            <Button variant="secondary" size="sm" loading={working} icon={<RotateCcw size={16} aria-hidden />} onClick={() => void act('need')} aria-label={`Need ${essential.name} again`}>
+              Need again
+            </Button>
+          )
         ) : essential.status === 'needed' ? (
           <Button variant="secondary" size="sm" loading={working} icon={<Hand size={16} aria-hidden />} onClick={() => void act('claim')} aria-label={`I’ll get ${essential.name}`}>
             I’ll get it
@@ -203,10 +213,11 @@ function EssentialDetails({ id, onClose }: { id: string; onClose: () => void }) 
   const toast = useToast()
   const restock = useRestock()
   const e = essentials.find((x) => x.id === id)
-  const ids = { name: useId(), cat: useId(), note: useId(), to: useId() }
+  const ids = { name: useId(), cat: useId(), note: useId(), qty: useId(), to: useId() }
   const [name, setName] = useState(e?.name ?? '')
   const [category, setCategory] = useState<EssentialCategory | ''>(e?.category ?? '')
   const [note, setNote] = useState(e?.note ?? '')
+  const [quantity, setQuantity] = useState(e?.quantity ?? '')
   const [saving, setSaving] = useState(false)
   const [working, setWorking] = useState<string | null>(null)
   const [archiving, setArchiving] = useState(false)
@@ -233,7 +244,11 @@ function EssentialDetails({ id, onClose }: { id: string; onClose: () => void }) 
   }
   const me = user?.id
   const claimer = e.claimed_by ? memberById.get(e.claimed_by) : undefined
-  const dirty = name.trim() !== e.name || (category || null) !== e.category || (note.trim() || null) !== (e.note ?? null)
+  const dirty =
+    name.trim() !== e.name ||
+    (category || null) !== e.category ||
+    (note.trim() || null) !== (e.note ?? null) ||
+    (quantity.trim() || null) !== (e.quantity ?? null)
 
   const run = async (action: 'claim' | 'release' | 'takeover' | 'need' | 'handover', to?: string) => {
     setWorking(action)
@@ -245,7 +260,7 @@ function EssentialDetails({ id, onClose }: { id: string; onClose: () => void }) 
 
   const save = async () => {
     setSaving(true)
-    const res = await editEssential(e.id, { name: name.trim(), category: category || null, note: note.trim() || null })
+    const res = await editEssential(e.id, { name: name.trim(), category: category || null, note: note.trim() || null, quantity: quantity.trim() || null })
     setSaving(false)
     if (!res.ok) return toast.error(res.error)
     toast.success('Saved')
@@ -322,10 +337,13 @@ function EssentialDetails({ id, onClose }: { id: string; onClose: () => void }) 
             ))}
           </select>
         </Field>
-        <Field label="Note" htmlFor={ids.note} hint="Brand, size, how many">
-          <input id={ids.note} className="field" value={note} maxLength={120} placeholder="Optional" onChange={(ev) => setNote(ev.target.value)} />
+        <Field label="Usual amount" htmlFor={ids.qty} hint="e.g. 24-roll pack">
+          <input id={ids.qty} className="field" value={quantity} maxLength={40} placeholder="Optional" onChange={(ev) => setQuantity(ev.target.value)} />
         </Field>
       </div>
+      <Field label="Note" htmlFor={ids.note} hint="e.g. the unscented one">
+        <input id={ids.note} className="field" value={note} maxLength={120} placeholder="Optional" onChange={(ev) => setNote(ev.target.value)} />
+      </Field>
       {dirty && (
         <Button loading={saving} disabled={!name.trim()} onClick={() => void save()} className="self-start">
           Save changes

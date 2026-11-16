@@ -10,6 +10,7 @@ import { checklistFromCsv, type ImportRow } from '@/lib/csv'
 import { bundledChecklist, runImport } from '@/household/importChecklist'
 import { useHousehold } from '@/household/HouseholdProvider'
 import { MakeItYours } from '@/personal/MakeItYours'
+import { NotificationSettings } from '@/personal/NotificationSettings'
 
 export function SettingsPage() {
   const { user, signOut } = useAuth()
@@ -73,6 +74,10 @@ export function SettingsPage() {
         <h1 className="text-display pt-2 pb-6 font-extrabold">Settings</h1>
 
         <MakeItYours />
+
+        <hr className="border-line my-8" />
+
+        <NotificationSettings />
 
         <hr className="border-line my-8" />
 

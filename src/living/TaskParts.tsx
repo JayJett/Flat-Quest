@@ -8,7 +8,7 @@ import { useToast } from '@/components/Toast'
 import { Button, Field, Segmented } from '@/components/ui'
 import { useHousehold } from '@/household/HouseholdProvider'
 import type { TaskRow, TaskStatus } from '@/lib/database.types'
-import { isDay, todayLocal } from '@/lib/dates'
+import { formatDay, isDay, todayLocal } from '@/lib/dates'
 import { useCelebration } from '@/motion/Celebration'
 import { rowMotion, SPRINGS } from '@/motion/motion'
 import { TickButton } from '@/motion/TickButton'
@@ -321,5 +321,49 @@ function TaskDetails({ id, onClose }: { id: string; onClose: () => void }) {
         onClose={() => setArchiving(false)}
       />
     </div>
+  )
+}
+
+/** A row in the archive: what it was, when it was put away, and a one-tap Restore. */
+export function ArchivedTaskItem({ task, onOpen }: { task: TaskRow; onOpen: (t: TaskRow) => void }) {
+  const { memberById } = useHousehold()
+  const { updateTask } = useLiving()
+  const toast = useToast()
+  const level = useMotionLevel()
+  const [busy, setBusy] = useState(false)
+  const who = task.assignee_id ? memberById.get(task.assignee_id)?.profile.display_name : null
+  const meta = [
+    task.archived_at ? `Archived ${formatDay(todayLocal(new Date(task.archived_at))) || ''}` : 'Archived',
+    task.status === 'done' && task.completed_at ? `done ${formatDay(todayLocal(new Date(task.completed_at)))}` : 'not done',
+    who ? `for ${who}` : null,
+  ].filter(Boolean)
+  return (
+    <motion.li layout={level !== 'reduced'} {...rowMotion(level)} transition={SPRINGS[level].settle} data-testid="archived-task-row">
+      <div className="flex min-h-[64px] items-center gap-3 py-1.5">
+        <span className="bg-surface-2 text-ink-2 flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full" aria-hidden>
+          <Archive size={15} />
+        </span>
+        <button type="button" onClick={() => onOpen(task)} className="pressable -my-1 min-w-0 flex-1 rounded-xl py-1 text-left">
+          <span className="text-ink-2 block truncate text-[17px] font-semibold">{task.title}</span>
+          <span className="text-ink-2 block truncate text-[14px]">{meta.join(' · ')}</span>
+        </button>
+        <Button
+          variant="secondary"
+          size="sm"
+          loading={busy}
+          icon={<ArchiveRestore size={16} aria-hidden />}
+          aria-label={`Restore ${task.title}`}
+          onClick={async () => {
+            setBusy(true)
+            const res = await updateTask(task.id, { archived_at: null })
+            setBusy(false)
+            if (!res.ok) return toast.error(res.error)
+            toast.success(`${task.title} is back on the list`)
+          }}
+        >
+          Restore
+        </Button>
+      </div>
+    </motion.li>
   )
 }

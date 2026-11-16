@@ -1,4 +1,4 @@
-import { ListTodo, ShoppingBasket, AtSign, Bell, Check, CheckCheck, Gift, Images, MessageCircle, PackageCheck, ShoppingBag, Sparkles, Truck, UserRound, Users, X, type LucideIcon } from 'lucide-react'
+import { AlarmClock, ListTodo, ShoppingBasket, AtSign, Bell, Check, CheckCheck, Gift, Images, MessageCircle, PackageCheck, ShoppingBag, Sparkles, Truck, UserRound, Users, X, type LucideIcon } from 'lucide-react'
 import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } from 'motion/react'
 import { useMemo, useRef, useState, type PointerEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -24,6 +24,7 @@ const KIND_ICON: Record<EventKind, LucideIcon> = {
   history: Bell,
   essential: ShoppingBasket,
   task: ListTodo,
+  reminder: AlarmClock,
 }
 
 /** Top-right bell. The badge only appears when something is unread. */

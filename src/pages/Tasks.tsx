@@ -1,4 +1,4 @@
-import { ListChecks } from 'lucide-react'
+import { Archive, ListChecks } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
@@ -9,12 +9,12 @@ import { AnimatedNumber, ErrorPanel, Segmented, Spinner } from '@/components/ui'
 import type { TaskRow } from '@/lib/database.types'
 import { sortTasks, TASK_GROUP_LABEL, taskGroup, type TaskGroup } from '@/living/living'
 import { useLiving } from '@/living/LivingProvider'
-import { TaskItem, TaskQuickAdd, TaskSheet } from '@/living/TaskParts'
+import { ArchivedTaskItem, TaskItem, TaskQuickAdd, TaskSheet } from '@/living/TaskParts'
 import { SPRINGS } from '@/motion/motion'
 import { useMotionLevel } from '@/personal/PreferencesProvider'
 import { BackButton, goBack } from './RoomDetail'
 
-type View = 'open' | 'mine' | 'done'
+type View = 'open' | 'mine' | 'done' | 'archived'
 const ORDER: TaskGroup[] = ['overdue', 'today', 'soon', 'later', 'someday']
 
 /** Things to do around the flat: simple tasks with a person and maybe a day. */
@@ -23,8 +23,27 @@ export function TasksPage() {
   const toast = useToast()
   const { user } = useAuth()
   const level = useMotionLevel()
-  const { status, error, tasks, reload } = useLiving()
+  const { status, error, tasks, reload, loadArchivedTasks } = useLiving()
   const [view, setView] = useState<View>('open')
+  const [archiveState, setArchiveState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [archiveAttempt, setArchiveAttempt] = useState(0)
+  const openArchive = () => {
+    setView('archived')
+    setArchiveAttempt((n) => n + 1)
+  }
+  // Archived tasks aren't part of the everyday load; fetch them whenever the archive opens.
+  useEffect(() => {
+    if (view !== 'archived') return
+    let active = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- shows progress for the fetch below
+    setArchiveState('loading')
+    void loadArchivedTasks().then((res) => {
+      if (active) setArchiveState(res.ok ? 'ready' : 'error')
+    })
+    return () => {
+      active = false
+    }
+  }, [view, archiveAttempt, loadArchivedTasks])
   const [open, setOpen] = useState<TaskRow | null>(null)
   const [params, setParams] = useSearchParams()
   const wanted = params.get('task')
@@ -33,10 +52,11 @@ export function TasksPage() {
     if (!wanted || status !== 'ready') return
     const t = tasks.find((x) => x.id === wanted)
     /* eslint-disable react-hooks/set-state-in-effect -- consuming a one-off URL parameter */
-    if (t && !t.archived_at) {
+    if (t) {
       setOpen(t)
-      setView(t.status === 'done' ? 'done' : 'open')
-    } else toast.show('That task has been archived or is no longer here.')
+      if (t.archived_at) openArchive()
+      else setView(t.status === 'done' ? 'done' : 'open')
+    } else toast.show('That task is no longer here.')
     /* eslint-enable react-hooks/set-state-in-effect */
     setParams({}, { replace: true })
   }, [wanted, status, tasks, setParams, toast])
@@ -45,7 +65,8 @@ export function TasksPage() {
   const openTasks = useMemo(() => sortTasks(live.filter((t) => t.status !== 'done')), [live])
   const mine = openTasks.filter((t) => t.assignee_id === user?.id)
   const done = useMemo(() => live.filter((t) => t.status === 'done').sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? '')), [live])
-  const list = view === 'open' ? openTasks : view === 'mine' ? mine : done
+  const archived = useMemo(() => tasks.filter((t) => t.archived_at).sort((a, b) => (b.archived_at ?? '').localeCompare(a.archived_at ?? '')), [tasks])
+  const list = view === 'open' ? openTasks : view === 'mine' ? mine : view === 'done' ? done : archived
   const groups = view === 'done' ? [{ key: 'done', label: 'Recently done', tasks: done }] : ORDER.map((g) => ({ key: g, label: TASK_GROUP_LABEL[g], tasks: list.filter((t) => taskGroup(t) === g) })).filter((g) => g.tasks.length)
 
   return (
@@ -71,6 +92,14 @@ export function TasksPage() {
         <TaskQuickAdd />
 
         <div className="mt-6">
+          {view === 'archived' ? (
+            <div className="flex min-h-11 items-center justify-between gap-3">
+              <h2 className="text-title font-bold">Archived</h2>
+              <button type="button" onClick={() => setView('open')} className="pressable text-accent-ink min-h-11 rounded-xl px-2 font-bold">
+                Back to tasks
+              </button>
+            </div>
+          ) : (
           <Segmented
             label="Show"
             value={view}
@@ -81,9 +110,33 @@ export function TasksPage() {
               { value: 'done', label: 'Done', count: done.length },
             ]}
           />
+          )}
         </div>
 
-        {status === 'loading' && tasks.length === 0 ? (
+        {view === 'archived' ? (
+          <motion.div key="archived" initial={{ opacity: 0, y: level === 'reduced' ? 0 : 6 }} animate={{ opacity: 1, y: 0 }} transition={SPRINGS[level].snappy}>
+            <p className="text-ink-2 mt-1 text-[14px]">Put away, not deleted. Restore anything to bring it back to the list.</p>
+            {archiveState === 'loading' && archived.length === 0 ? (
+              <div className="py-10 text-center">
+                <Spinner label="Loading archived tasks" />
+              </div>
+            ) : archiveState === 'error' ? (
+              <ErrorPanel message="Couldn’t load archived tasks." onRetry={() => openArchive()} />
+            ) : archived.length === 0 ? (
+              <p className="text-ink-2 py-10 text-center text-[15px]" data-testid="archive-empty">
+                Nothing archived. Archive a task from its details when it no longer applies.
+              </p>
+            ) : (
+              <ul className="mt-2" aria-label="Archived tasks">
+                <AnimatePresence initial={false}>
+                  {archived.map((t) => (
+                    <ArchivedTaskItem key={t.id} task={t} onOpen={setOpen} />
+                  ))}
+                </AnimatePresence>
+              </ul>
+            )}
+          </motion.div>
+        ) : status === 'loading' && tasks.length === 0 ? (
           <div className="py-10 text-center">
             <Spinner label="Loading tasks" />
           </div>
@@ -125,6 +178,14 @@ export function TasksPage() {
           </AnimatePresence>
         )}
       </div>
+      {view !== 'archived' && (
+        <div className="mt-8 flex justify-center px-4">
+          <button type="button" onClick={() => openArchive()} className="pressable text-ink-2 active:bg-surface-2 inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-[15px] font-semibold">
+            <Archive size={17} aria-hidden />
+            Archived tasks
+          </button>
+        </div>
+      )}
       <TaskSheet task={open} onClose={() => setOpen(null)} />
     </>
   )

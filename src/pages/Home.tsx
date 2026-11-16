@@ -9,7 +9,6 @@ import { HouseholdActivity } from '@/components/HouseholdActivity'
 import { HouseholdPhoto } from '@/components/HouseholdPhoto'
 import { ItemSheet } from '@/components/ItemSheet'
 import { AnimatedNumber, EmptyState, IconButton, ProgressBar, SectionHeader } from '@/components/ui'
-import { RoomIcon } from '@/design/icons'
 import { roomColor } from '@/design/tokens'
 import type { EssentialRow, TaskRow } from '@/lib/database.types'
 import { friendlyDay } from '@/lib/dates'
@@ -24,11 +23,11 @@ import { usePreferences } from '@/personal/PreferencesProvider'
 import { greeting, type HomeSectionId } from '@/personal/themes'
 import { useShopping } from '@/shopping/ShoppingProvider'
 import { shoppingSummary, summaryLine } from '@/lib/shopping'
-import { nextAction, openItemsFor, progressOf, roomProgress } from '@/lib/stats'
+import { nextAction, openItemsFor, progressOf } from '@/lib/stats'
 import { useHousehold } from '@/household/HouseholdProvider'
 
 export function HomePage() {
-  const { me, household, items, rooms } = useHousehold()
+  const { me, household, items } = useHousehold()
   const { prefs, motion: level } = usePreferences()
   const [quickAdd, setQuickAdd] = useState<QuickAddKind | null>(null)
   const [customising, setCustomising] = useState(false)
@@ -37,7 +36,7 @@ export function HomePage() {
   const name = prefs.greetingName || firstName
   // Sections with nothing to show (no deliveries in transit, no rooms) take no space at all.
   const inTransit = items.some((i) => !i.is_complete && (i.status === 'ordered' || i.status === 'on_the_way' || i.status === 'ready_to_collect'))
-  const sections = prefs.layout.filter((s) => !s.hidden && (s.id !== 'deliveries' || inTransit) && (s.id !== 'rooms' || rooms.length > 0))
+  const sections = prefs.layout.filter((s) => !s.hidden && (s.id !== 'deliveries' || inTransit))
 
   return (
     <>
@@ -65,6 +64,12 @@ export function HomePage() {
           </div>
           <HouseholdPhoto size="clamp(68px, 21vw, 96px)" />
         </section>
+
+        {/* Furnishing progress is always first and always shown; it isn't part of the
+            personal layout, so it never moves while the sections below rearrange. */}
+        <div data-section="progress" className="lg:max-w-[calc(50%-20px)]">
+          <ProgressSection />
+        </div>
 
         <div className="grid items-start gap-x-10 lg:grid-cols-2">
           <AnimatePresence initial={false}>
@@ -113,10 +118,6 @@ function HomeSection({ id, onAdd, focusShown }: { id: HomeSectionId; onAdd: (k: 
       return <EssentialsSection onAdd={() => onAdd('essential')} />
     case 'deliveries':
       return <DeliveriesSection />
-    case 'progress':
-      return <ProgressSection />
-    case 'rooms':
-      return <RoomsSection />
     case 'activity':
       return <HouseholdActivityWrapper />
   }
@@ -362,44 +363,6 @@ function ProgressSection() {
         </Link>
       )}
     </div>
-  )
-}
-
-function RoomsSection() {
-  const { rooms, items } = useHousehold()
-  const perRoom = useMemo(() => roomProgress(rooms, items), [rooms, items])
-  if (rooms.length === 0) return null
-  return (
-    <section className="mb-9" aria-label="Room by room">
-      <SectionHeader title="Room by room" action={<SeeAll to="/rooms">Show all</SeeAll>} />
-      <ul className="flex flex-col">
-        {rooms.map((room) => {
-          const p = perRoom.get(room.id)
-          const c = roomColor(room.color)
-          return (
-            <li key={room.id}>
-              <Link to={`/rooms/${room.id}`} className="pressable active:bg-surface-2 -mx-2 flex min-h-[64px] items-center gap-3.5 rounded-2xl px-2 py-2">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ backgroundColor: c.hex, color: c.on }} aria-hidden>
-                  <RoomIcon name={room.icon} size={22} strokeWidth={1.9} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-baseline justify-between gap-2">
-                    <span className="truncate font-semibold">{room.name}</span>
-                    <span className="text-ink-2 shrink-0 text-[14px] font-semibold tabular-nums">
-                      {p?.ready ?? 0}/{p?.total ?? 0}
-                    </span>
-                  </span>
-                  <span className="mt-1.5 block">
-                    <ProgressBar value={p && p.total ? p.ready / p.total : 0} color={c.hex} height={5} label={`${room.name} progress`} />
-                  </span>
-                </span>
-                <ChevronRight size={18} className="text-ink-3 shrink-0" aria-hidden />
-              </Link>
-            </li>
-          )
-        })}
-      </ul>
-    </section>
   )
 }
 
