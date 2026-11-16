@@ -109,7 +109,7 @@ function WhoPicker({ value, onChange }: { value: string | null; onChange: (v: st
   const { members } = useHousehold()
   const ordered = [...members].sort((a, b) => (a.userId === user?.id ? -1 : b.userId === user?.id ? 1 : 0))
   return (
-    <div role="radiogroup" aria-label="Who" className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+    <div role="radiogroup" aria-label="Who" className="no-scrollbar chip-scroll -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
       <Chip selected={value === null} onClick={() => onChange(null)}>
         Anyone
       </Chip>
@@ -146,7 +146,7 @@ function WhenPicker({ value, onChange }: { value: string | null; onChange: (v: s
   const [picking, setPicking] = useState(mode === 'pick')
   return (
     <div>
-      <div role="radiogroup" aria-label="When" className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+      <div role="radiogroup" aria-label="When" className="no-scrollbar chip-scroll -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
         <Chip selected={mode === 'none' && !picking} onClick={() => { setPicking(false); onChange(null) }}>No date</Chip>
         <Chip selected={mode === 'today' && !picking} onClick={() => { setPicking(false); onChange(today) }}>Today</Chip>
         <Chip selected={mode === 'tomorrow' && !picking} onClick={() => { setPicking(false); onChange(tomorrow) }}>Tomorrow</Chip>

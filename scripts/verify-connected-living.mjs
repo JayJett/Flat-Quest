@@ -161,6 +161,36 @@ const peekTasks = await C.from('household_tasks').select('id').ilike('title', '%
 pass((peekIdeas.data ?? []).length === 0 && (peekVisuals.data ?? []).length === 0 && !(peekTasks.data ?? []).some((t) => t.id === muted.id),
   'search sources from another flat are invisible to an outsider')
 
+// 4d. Phase 9: a shared room cover and description sync live; covers stay inside their room and flat.
+const p9 = { bRooms: [], cRooms: [] }
+await Promise.all([
+  listen(B, 'b', 'rooms', `household_id=eq.${hid}`, p9.bRooms),
+  listen(C, 'c', 'rooms', null, p9.cRooms),
+])
+const visual = async (client, flat, roomId) => {
+  const r = ok(await client.rpc('reserve_media_upload', { p_household: flat, p_kind: 'visual', p_ext: 'webp' }), 'reserve')
+  return ok(await client.from('room_visuals').insert({ household_id: flat, room_id: roomId, kind: 'photo', photo_path: r.path, thumbnail_path: r.thumbnail_path }).select().single(), 'visual')
+}
+const lounge = ok(await A.from('rooms').insert({ household_id: hid, name: 'Lounge' }).select().single(), 'second room')
+const coverPhoto = await visual(A, hid, room.id)
+const loungePhoto = await visual(A, hid, lounge.id)
+ok(await A.from('rooms').update({ cover_visual_id: coverPhoto.id, description: 'Where the kettle lives' }).eq('id', room.id), 'set cover')
+await waitFor(() => p9.bRooms.some((p) => p.new?.id === room.id && p.new.cover_visual_id === coverPhoto.id), 'cover sync')
+pass(p9.bRooms.some((p) => p.new?.description === 'Where the kettle lives'), 'a new cover and description appear live for flatmates')
+const wrongRoom = await A.from('rooms').update({ cover_visual_id: loungePhoto.id }).eq('id', room.id)
+pass(wrongRoom.error?.code === '23514', 'a photo from another room cannot be the cover')
+const cFlat = ok(await C.from('households').select('id').neq('id', hid).limit(1).single(), 'outsider flat id').id
+const cRoom = ok(await C.from('rooms').insert({ household_id: cFlat, name: 'Their room' }).select().single(), 'outsider room')
+const cPhoto = await visual(C, cFlat, cRoom.id)
+const crossFlat = await A.from('rooms').update({ cover_visual_id: cPhoto.id }).eq('id', room.id)
+pass(Boolean(crossFlat.error), 'a photo from another flat cannot be the cover')
+const hijack = await C.from('rooms').update({ cover_visual_id: cPhoto.id, description: 'mine' }).eq('id', room.id).select()
+pass(!hijack.error && (hijack.data ?? []).length === 0, 'an outsider cannot change this flat’s room')
+ok(await A.from('room_visuals').delete().eq('id', coverPhoto.id), 'delete cover photo')
+await waitFor(() => p9.bRooms.some((p) => p.new?.id === room.id && p.new.cover_visual_id === null && p.new.description === 'Where the kettle lives'), 'cover cleared')
+pass(true, 'deleting the photo clears the cover live, keeping the description')
+pass(!p9.cRooms.some((p) => p.new?.household_id === hid || p.old?.id === room.id), 'outsiders receive no room changes from this flat')
+
 // 5. Removal takes effect immediately, including for the removed person's open session.
 ok(await A.rpc('remove_household_member', { p_household: hid, p_user: blair.id }), 'remove')
 await waitFor(() => seen.bMembers.some((p) => p.old?.user_id === blair.id), 'membership delete event')

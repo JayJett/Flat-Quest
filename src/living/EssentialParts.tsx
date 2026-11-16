@@ -5,7 +5,7 @@ import { useAuth } from '@/auth/AuthProvider'
 import { Avatar } from '@/components/Avatar'
 import { ConfirmSheet, Sheet } from '@/components/Sheet'
 import { useToast } from '@/components/Toast'
-import { Button, Field } from '@/components/ui'
+import { Button, Field, SkeletonRows } from '@/components/ui'
 import { useHousehold } from '@/household/HouseholdProvider'
 import type { EssentialRestockRow, EssentialRow } from '@/lib/database.types'
 import { eventTime } from '@/lib/events'
@@ -122,9 +122,11 @@ export function EssentialItem({ essential, onOpen }: { essential: EssentialRow; 
  * flat already tracks and brings them back ("Need again") instead of creating a duplicate.
  */
 export function EssentialQuickAdd({ autoFocus, onAdded }: { autoFocus?: boolean; onAdded?: () => void }) {
-  const { essentials, addEssential } = useLiving()
+  const { essentials, addEssential, status } = useLiving()
   const toast = useToast()
   const [text, setText] = useState('')
+  // Suggestions depend on what's already on the list, so wait for it rather than flash wrong chips.
+  const ready = status === 'ready'
   const [busy, setBusy] = useState(false)
   const listId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -178,8 +180,9 @@ export function EssentialQuickAdd({ autoFocus, onAdded }: { autoFocus?: boolean;
             : `You’ve had ${match.essential.name} before — adding it marks it as needed again.`}
         </p>
       )}
-      {suggestions.length > 0 && (
-        <ul className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1" aria-label={text ? 'Suggestions' : 'Common essentials'}>
+      {!ready && !text && <div className="mt-3 min-h-11" aria-hidden />}
+      {ready && suggestions.length > 0 && (
+        <ul className="no-scrollbar chip-scroll -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1" aria-label={text ? 'Suggestions' : 'Common essentials'}>
           <AnimatePresence initial={false}>
             {suggestions.map((s) => (
               <motion.li key={s.name} layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 0.16 }}>
@@ -355,7 +358,7 @@ function EssentialDetails({ id, onClose }: { id: string; onClose: () => void }) 
       <section aria-label="Restock history">
         <h3 className="text-[15px] font-bold">Recently restocked</h3>
         {history === null ? (
-          <p className="text-ink-2 mt-1 text-[14px]">Loading…</p>
+          <SkeletonRows label="Loading restock history" rows={2} compact />
         ) : history.length === 0 ? (
           <p className="text-ink-2 mt-1 text-[14px]">Not restocked yet.</p>
         ) : (

@@ -1,7 +1,7 @@
 import { ChevronRight } from 'lucide-react'
 import { Link } from 'react-router'
 import { EarlierRecords, TimelineRow, useTimeline } from '@/activity/Timeline'
-import { SectionHeader } from './ui'
+import { SectionHeader, SkeletonRows } from './ui'
 
 const PREVIEW = 5
 
@@ -22,7 +22,7 @@ export function HouseholdActivity() {
           </Link>
         }
       />
-      {state === 'loading' && events.length === 0 && <p className="text-ink-2 text-[14px]">Loading…</p>}
+      {state === 'loading' && events.length === 0 && <SkeletonRows label="Loading activity" rows={3} compact />}
       {state === 'error' && <p className="text-ink-2 text-[14px]" role="status">{error} It will retry when you return or reconnect.</p>}
       {state === 'ready' && real.length === 0 && (
         <p className="text-ink-2 text-[14px]">Ticked-off items, new ideas, picks and comments will appear here as they happen.</p>

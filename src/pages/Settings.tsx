@@ -1,3 +1,4 @@
+import { InstallHint, shouldShowIosInstallHint } from '@/components/InstallHint'
 import { ChevronRight, FileUp, LogOut, RefreshCw } from 'lucide-react'
 import { useId, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
@@ -140,6 +141,8 @@ export function SettingsPage() {
 
         <hr className="border-line my-8" />
 
+        <InstallHintBlock />
+
         <section aria-labelledby="account-h">
           <h2 id="account-h" className="text-title font-bold">
             Account
@@ -157,7 +160,7 @@ export function SettingsPage() {
           </button>
         </section>
 
-        <p className="text-ink-2 mt-10 text-[14px]">Flat Quest · Phase 1</p>
+        <p className="text-ink-2 mt-10 text-[14px]">Flat Quest</p>
       </div>
 
       <Sheet open={pending !== null} onClose={() => setPending(null)} title="Import checklist">
@@ -207,6 +210,16 @@ export function SettingsPage() {
         }}
         onClose={() => setConfirmSignOut(false)}
       />
+    </>
+  )
+}
+
+function InstallHintBlock() {
+  if (!shouldShowIosInstallHint()) return null
+  return (
+    <>
+      <InstallHint />
+      <hr className="border-line my-8" />
     </>
   )
 }

@@ -157,6 +157,15 @@
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+  /* Horizontally scrolling chip rows: a short fade at the trailing edge hints there's more. */
+  .chip-scroll {
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
+  /* Shared skeleton for list rows while data loads (Phase 9). */
+  .skeleton {
+    background: var(--color-surface-2);
+    border-radius: 10px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -42,7 +42,7 @@ export function MakeItYours() {
 
       <fieldset className="mt-5">
         <legend className="mb-3 text-[15px] font-semibold">Accent colour</legend>
-        <div role="radiogroup" aria-label="Accent colour" className="flex flex-wrap gap-3">
+        <div role="radiogroup" aria-label="Accent colour" className="grid max-w-[360px] grid-cols-5 items-start gap-1">
           {ACCENTS.map((a) => {
             const selected = prefs.accent === a.key
             return (
@@ -53,9 +53,9 @@ export function MakeItYours() {
                 aria-checked={selected}
                 aria-label={a.label}
                 onClick={() => void update({ accent: a.key })}
-                className="pressable flex w-[60px] flex-col items-center gap-1.5"
+                className="pressable flex min-w-0 flex-col items-center gap-1.5 py-1"
               >
-                <span className="relative flex h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: a.fill }}>
+                <span className="relative flex h-11 w-11 items-center justify-center rounded-full min-[380px]:h-12 min-[380px]:w-12" style={{ backgroundColor: a.fill }}>
                   {selected && (
                     <motion.span initial={{ scale: level === 'reduced' ? 1 : 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={SPRINGS[level].pop}>
                       <Check size={22} strokeWidth={3} style={{ color: a.on }} aria-hidden />
@@ -63,7 +63,7 @@ export function MakeItYours() {
                   )}
                   {selected && <span className="absolute -inset-[5px] rounded-full border-2" style={{ borderColor: a.fill }} aria-hidden />}
                 </span>
-                <span className={`text-[12px] leading-tight ${selected ? 'font-bold' : 'text-ink-2 font-medium'}`}>{a.label}</span>
+                <span className={`max-w-full text-center text-[12px] leading-tight [overflow-wrap:anywhere] ${selected ? 'font-bold' : 'text-ink-2 font-medium'}`}>{a.label}</span>
               </button>
             )
           })}

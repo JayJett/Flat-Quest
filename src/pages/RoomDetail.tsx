@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, Pencil, Plus } from 'lucide-react'
+import { ArrowUpDown, ChevronLeft, Plus } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
@@ -8,16 +8,17 @@ import { ItemRow } from '@/components/ItemRow'
 import { ItemSheet } from '@/components/ItemSheet'
 import { RoomSheet } from '@/components/RoomSheet'
 import { EmptyState, IconButton, Segmented } from '@/components/ui'
-import { RoomIcon } from '@/design/icons'
-import { roomColor } from '@/design/tokens'
 import { PRIORITIES, PRIORITY_LABEL, PRIORITY_RANK, STATUS_RANK, type Item } from '@/lib/domain'
 import { isUnclaimed, progressOf } from '@/lib/stats'
 import { useHousehold } from '@/household/HouseholdProvider'
 import { useToast } from '@/components/Toast'
 import { ShoppingSheet } from '@/shopping/ShoppingSheet'
+import { PersonaliseRoomSheet } from '@/rooms/PersonaliseRoomSheet'
+import { RoomHeader } from '@/rooms/RoomHeader'
 
 type Filter = 'all' | 'mine' | 'unclaimed' | 'done'
 type Sort = 'priority' | 'name' | 'status'
+const SORT_LABEL: Record<Sort, string> = { priority: 'priority', name: 'name', status: 'plan' }
 
 export function RoomDetailPage() {
   const { roomId } = useParams()
@@ -36,6 +37,7 @@ export function RoomDetailPage() {
   const [open, setOpen] = useState<Item | null>(null)
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [personalising, setPersonalising] = useState(false)
 
   // Deep links: /rooms/<room>?item=<id>[&option=<id>][&discuss=<comment>]
   useEffect(() => {
@@ -98,7 +100,6 @@ export function RoomDetailPage() {
     )
   }
 
-  const c = roomColor(room.color)
   const active = visible.filter((i) => i.status !== 'not_needed' || filter !== 'all' || sort !== 'priority')
   const notNeeded = filter === 'all' && sort === 'priority' ? visible.filter((i) => i.status === 'not_needed') : []
   const groups =
@@ -116,9 +117,6 @@ export function RoomDetailPage() {
         back={<BackButton onClick={() => goBack(navigate, '/rooms')} />}
         actions={
           <>
-            <IconButton label="Edit room" onClick={() => setEditing(true)}>
-              <Pencil size={21} aria-hidden />
-            </IconButton>
             <IconButton label="Add an item" onClick={() => setAdding(true)}>
               <Plus size={24} aria-hidden />
             </IconButton>
@@ -126,52 +124,31 @@ export function RoomDetailPage() {
         }
       />
       <div className="px-4 lg:px-0">
-        <div className="mb-5"><Segmented label="Room view" value="checklist" onChange={() => navigate(`/rooms/${room.id}/visual`)} options={[{ value: 'checklist', label: 'Checklist' }, { value: 'visual', label: 'Visual Home' }]} /></div>
-        <section
-          className="relative mt-1 overflow-hidden rounded-[var(--radius-tile)] p-5"
-          style={{ backgroundColor: c.hex, color: c.on }}
-        >
-          <RoomIcon name={room.icon} aria-hidden strokeWidth={1.1} className="pointer-events-none absolute -top-4 -right-4 h-40 w-40 opacity-90" />
-          <div className="relative pt-14">
-            <h1 className="text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">{room.name}</h1>
-            <p className="mt-1 text-[19px] font-bold" style={{ opacity: 0.92 }}>
-              {progress.total === 0
-                ? 'Nothing here yet'
-                : progress.ready === progress.total
-                  ? 'All set'
-                  : `${progress.ready} of ${progress.total} in the flat`}
-            </p>
-            <div
-              className="mt-4 h-2 w-full overflow-hidden rounded-full"
-              style={{ backgroundColor: c.on === '#FFFFFF' ? 'rgb(255 255 255 / 0.3)' : 'rgb(17 17 17 / 0.14)' }}
-            >
-              <div
-                className="h-full rounded-full transition-[width] duration-700 ease-out"
-                style={{ width: `${progress.ratio * 100}%`, backgroundColor: c.on }}
-              />
-            </div>
-          </div>
-        </section>
+        <div className="mb-3"><Segmented label="Room view" value="checklist" onChange={() => navigate(`/rooms/${room.id}/visual`)} options={[{ value: 'checklist', label: 'Checklist' }, { value: 'visual', label: 'Visual Home' }]} /></div>
+        <RoomHeader room={room} progress={progress} onPersonalise={() => setPersonalising(true)} />
 
         {roomItems.length > 0 && (
-          <div className="mt-5 flex flex-col gap-3">
-            <Segmented
-              label="Filter items"
-              value={filter}
-              onChange={setFilter}
-              options={[
-                { value: 'all', label: 'All' },
-                { value: 'mine', label: 'Mine', count: counts.mine },
-                { value: 'unclaimed', label: 'Open', count: counts.unclaimed },
-                { value: 'done', label: 'Done', count: counts.done },
-              ]}
-            />
-            <label className="text-ink-2 relative inline-flex min-h-11 items-center gap-1 self-end text-[15px] font-semibold">
-              Sort by
-              <span className="text-ink">{sort === 'priority' ? 'priority' : sort === 'name' ? 'name' : 'plan'}</span>
-              <ChevronDown size={16} aria-hidden />
+          <div className="mt-3 flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <Segmented
+                label="Filter items"
+                value={filter}
+                onChange={setFilter}
+                options={[
+                  { value: 'all', label: 'All' },
+                  { value: 'mine', label: 'Mine', count: counts.mine },
+                  { value: 'unclaimed', label: 'Open', count: counts.unclaimed },
+                  { value: 'done', label: 'Done', count: counts.done },
+                ]}
+              />
+            </div>
+            <label
+              title={`Sort by ${SORT_LABEL[sort]}`}
+              className={`pressable relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${sort === 'priority' ? 'bg-surface-2 text-ink' : 'bg-accent-soft text-accent-ink'}`}
+            >
+              <ArrowUpDown size={20} aria-hidden />
               <select
-                aria-label="Sort items"
+                aria-label={`Sort items (now by ${SORT_LABEL[sort]})`}
                 value={sort}
                 onChange={(e) => setSort(e.target.value as Sort)}
                 className="absolute inset-0 cursor-pointer opacity-0"
@@ -208,7 +185,7 @@ export function RoomDetailPage() {
             transition={{ duration: 0.18 }}
           >
             {groups.map((g) => (
-              <section key={g.key} className="mt-4" aria-label={g.label || 'Items'}>
+              <section key={g.key} className="mt-3" aria-label={g.label || 'Items'}>
                 {g.label && (
                   <h2 className="text-ink-2 mb-1 text-[14px] font-bold">
                     {g.label} <span className="font-medium tabular-nums">· {g.items.length}</span>
@@ -269,6 +246,12 @@ export function RoomDetailPage() {
       />
       <ItemSheet open={adding} item={null} roomId={room.id} onClose={() => setAdding(false)} />
       <RoomSheet open={editing} room={room} onClose={() => setEditing(false)} />
+      <PersonaliseRoomSheet
+        open={personalising}
+        room={room}
+        onClose={() => setPersonalising(false)}
+        onEditDetails={() => { setPersonalising(false); setEditing(true) }}
+      />
     </>
   )
 }

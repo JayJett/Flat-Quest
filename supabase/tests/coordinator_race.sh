@@ -4,6 +4,7 @@
 #   2. many simultaneous "choose this option" decisions       -> exactly one option ends up selected
 #   3. many simultaneous preference inserts by one member     -> exactly one preference
 #   4. Phase 7: simultaneous adds of one essential, claims of it, and restocks of it
+#   5. Phase 9: simultaneous scheduled reminder runs -> one reminder per task, never two
 # Uses throwaway users and a throwaway household, and removes them afterwards.
 #
 #   FLATQUEST_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres supabase/tests/coordinator_race.sh
@@ -107,5 +108,18 @@ ess_restock_gen() { if [ $(( $1 % 2 )) -eq 0 ]; then u=$A; else u=$B; fi
 restocked="$(run_parallel essrestock 10 ess_restock_gen)"
 check "10 simultaneous restocks: none fails" 10 "$restocked"
 check "10 simultaneous restocks: exactly one restock recorded" 1 "$(P -c "select count(*) from public.essential_restocks where essential_id = '$ESS'")"
+
+# ---- Phase 9: overlapping reminder runs (e.g. a slow run still going when the next one starts)
+P >/dev/null <<SQL
+insert into public.household_tasks (household_id, title, assignee_id, due_on, created_by) values
+  ('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'Race one day late', '$B', (now() at time zone 'Pacific/Auckland')::date - 1, '$A'),
+  ('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'Race four days late', '$B', (now() at time zone 'Pacific/Auckland')::date - 4, '$A');
+SQL
+for i in $(seq 1 8); do
+  ( P -c "select private.send_reminders()" >/dev/null 2>&1 && echo ok >"$TMP/remind.$i" || echo error >"$TMP/remind.$i" ) &
+done
+wait
+check "8 simultaneous reminder runs: none fails" 8 "$(cat "$TMP"/remind.* | grep -c '^ok$' || true)"
+check "8 simultaneous reminder runs: exactly one reminder per overdue task" "1 1" "$(P -c "select string_agg(n::text, ' ') from (select count(nt.id) n from public.household_tasks t left join public.household_events e on e.task_id = t.id and e.type = 'task_reminder' left join public.notifications nt on nt.event_id = e.id where t.household_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' group by t.id) x")"
 
 exit $fail

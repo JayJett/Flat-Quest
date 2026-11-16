@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { PageHeader } from '@/components/AppShell'
 import { useToast } from '@/components/Toast'
-import { AnimatedNumber, ErrorPanel, Segmented, Spinner } from '@/components/ui'
+import { AnimatedNumber, ErrorPanel, Segmented, SkeletonRows } from '@/components/ui'
 import type { EssentialRow } from '@/lib/database.types'
 import { EssentialItem, EssentialQuickAdd, EssentialSheet } from '@/living/EssentialParts'
 import { isActiveEssential, sortEssentials } from '@/living/living'
@@ -81,9 +81,7 @@ export function EssentialsPage() {
         </div>
 
         {status === 'loading' && essentials.length === 0 ? (
-          <div className="py-10 text-center">
-            <Spinner label="Loading essentials" />
-          </div>
+          <SkeletonRows label="Loading essentials" />
         ) : status === 'error' ? (
           <ErrorPanel message={error ?? 'Couldn’t load essentials.'} onRetry={() => void reload()} />
         ) : (

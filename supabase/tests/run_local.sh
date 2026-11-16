@@ -26,3 +26,4 @@ psql -q -v ON_ERROR_STOP=1 -d "$DB" -f supabase/tests/phase5_verification.sql 2>
 psql -q -v ON_ERROR_STOP=1 -d "$DB" -f supabase/tests/phase6_verification.sql 2>&1 | grep -c "PASS:" | sed "s/^/Phase 6 checks passed: /"
 psql -q -v ON_ERROR_STOP=1 -d "$DB" -f supabase/tests/phase7_verification.sql 2>&1 | grep -c "PASS:" | sed "s/^/Phase 7 checks passed: /"
 psql -q -v ON_ERROR_STOP=1 -d "$DB" -f supabase/tests/phase8_verification.sql 2>&1 | grep -c "PASS:" | sed "s/^/Phase 8 checks passed: /"
+psql -q -v ON_ERROR_STOP=1 -d "$DB" -f supabase/tests/phase9_verification.sql 2>&1 | grep -c "PASS:" | sed "s/^/Phase 9 checks passed: /"

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { EarlierRecords, groupByDay, TimelineRow, useTimeline } from '@/activity/Timeline'
 import { PageHeader } from '@/components/AppShell'
-import { Button, ErrorPanel, Spinner } from '@/components/ui'
+import { Button, ErrorPanel, SkeletonRows } from '@/components/ui'
 import { BackButton, goBack } from './RoomDetail'
 
 /** Everything that has happened around the flat since history began, newest first. */
@@ -22,9 +22,7 @@ export function ActivityPage() {
           <p className="text-ink-2 mt-1 text-[16px]">What’s been happening around the flat.</p>
         </div>
         {state === 'loading' && events.length === 0 ? (
-          <div className="py-10 text-center">
-            <Spinner label="Loading activity" />
-          </div>
+          <SkeletonRows label="Loading activity" rows={5} />
         ) : state === 'error' ? (
           <ErrorPanel message={error ?? 'Activity couldn’t load.'} onRetry={() => void retry()} />
         ) : (
