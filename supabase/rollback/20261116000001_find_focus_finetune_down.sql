@@ -39,5 +39,35 @@ begin
 end $$;
 drop function if exists private.notification_category(text);
 alter table public.user_preferences drop column if exists muted_notifications;
+-- Restore the Phase 7 essentials guard (the Phase 8 one references the quantity column).
+create or replace function private.essentials_guard() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := (select auth.uid());
+begin
+  new.name := regexp_replace(trim(new.name), '\s+', ' ', 'g');
+  new.note := nullif(trim(coalesce(new.note, '')), '');
+  if tg_op = 'INSERT' then
+    new.created_by := v_uid;
+    new.created_at := now();
+    if new.status not in ('needed','stocked') then new.status := 'needed'; end if;
+    new.claimed_by := null;
+    new.archived_at := null;
+    new.restocked_at := null; new.restocked_by := null;
+    if new.status = 'needed' then new.needed_at := now(); new.needed_by := v_uid;
+    else new.needed_at := null; new.needed_by := null; end if;
+  else
+    if new.household_id <> old.household_id then
+      raise exception 'Essentials cannot move between flats' using errcode = '42501';
+    end if;
+    new.created_by := old.created_by; new.created_at := old.created_at;
+    -- The claimer left the flat (foreign key cleared claimed_by): the request is open again.
+    if new.claimed_by is null and new.status = 'getting' then new.status := 'needed'; end if;
+    if new.archived_at is not null and old.archived_at is null then
+      new.archived_at := now(); new.status := 'stocked'; new.claimed_by := null;
+    end if;
+  end if;
+  new.updated_at := now();
+  return new;
+end $$;
 alter table public.essentials drop column if exists quantity;
 commit;
