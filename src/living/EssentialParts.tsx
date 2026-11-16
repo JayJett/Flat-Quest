@@ -19,10 +19,12 @@ import { useLiving } from './LivingProvider'
 
 /** Shared restock flow: tick, friendly confirmation with Undo, and a burst when the list is cleared. */
 export function useRestock() {
-  const { actOnEssential, essentials } = useLiving()
+  const { actOnEssential, essentials, peekEssential } = useLiving()
   const toast = useToast()
   const celebration = useCelebration()
   return async (e: EssentialRow, el?: HTMLElement): Promise<boolean> => {
+    // Already restocked (a second tap on a row that's on its way out): nothing to do or say.
+    if (peekEssential(e.id)?.status === 'stocked') return true
     const othersActive = essentials.filter((x) => x.id !== e.id && isActiveEssential(x)).length
     const res = await actOnEssential(e.id, 'restock')
     if (!res.ok) {

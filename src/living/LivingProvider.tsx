@@ -22,6 +22,8 @@ interface LivingState {
   editEssential: (id: string, patch: Partial<Pick<EssentialRow, 'name' | 'category' | 'note' | 'quantity' | 'archived_at'>>) => Promise<Result<EssentialRow>>
   addTask: (input: TaskInput) => Promise<Result<TaskRow>>
   updateTask: (id: string, patch: TaskPatch) => Promise<Result<TaskRow>>
+  /** The latest known state of an essential (not a possibly stale render copy). */
+  peekEssential: (id: string) => EssentialRow | undefined
   /** Loads archived tasks (kept out of the everyday load) for the archive view. */
   loadArchivedTasks: () => Promise<Result>
 }
@@ -136,20 +138,29 @@ export function LivingProvider({ children }: { children: ReactNode }) {
 
   const actOnEssential = useCallback<LivingState['actOnEssential']>(async (id, action, opts) => {
     const before = essentialsRef.current.find((e) => e.id === id)
+    // Keep the ref current immediately, so a second tap sees this change straight away.
+    const sync = (row: EssentialRow) => {
+      essentialsRef.current = essentialsRef.current.map((e) => (e.id === row.id ? row : e))
+    }
     if (!before) return { ok: false, error: 'That essential is no longer on the list.' }
     if (!navigator.onLine) return { ok: false, error: 'You’re offline. Try again when you’re back online.' }
     // Optimistic: show the obvious next state straight away.
     const guess: Partial<EssentialRow> =
       action === 'restock' ? { status: 'stocked', claimed_by: null } : action === 'need' ? { status: 'needed', claimed_by: null, archived_at: null } : action === 'release' ? { status: 'needed', claimed_by: null } : {}
-    if (Object.keys(guess).length) setEssentials((prev) => prev.map((e) => (e.id === id ? { ...e, ...guess } : e)))
+    if (Object.keys(guess).length) {
+      sync({ ...before, ...guess })
+      setEssentials((prev) => prev.map((e) => (e.id === id ? { ...e, ...guess } : e)))
+    }
     hold(id, 1)
     const { data, error: err } = await supabase.rpc('update_essential', { p_essential: id, p_action: action, p_expected: before.status, p_to: opts?.to ?? null })
     hold(id, -1)
     if (err || !data) {
+      sync(before)
       setEssentials((prev) => prev.map((e) => (e.id === id ? before : e)))
       void load()
       return { ok: false, ...friendly(err, 'Couldn’t update that. Try again.') }
     }
+    sync(data)
     replaceEssential(data)
     return { ok: true, data }
   }, [load])
@@ -251,7 +262,10 @@ export function LivingProvider({ children }: { children: ReactNode }) {
   }, [hid])
 
   const value = useMemo<LivingState>(
-    () => ({ status, error, essentials, tasks, reload: load, addEssential, actOnEssential, editEssential, addTask, updateTask, loadArchivedTasks }),
+    () => ({
+      status, error, essentials, tasks, reload: load, addEssential, actOnEssential, editEssential, addTask, updateTask, loadArchivedTasks,
+      peekEssential: (id: string) => essentialsRef.current.find((e) => e.id === id),
+    }),
     [status, error, essentials, tasks, load, addEssential, actOnEssential, editEssential, addTask, updateTask, loadArchivedTasks],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
