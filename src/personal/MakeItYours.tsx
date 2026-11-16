@@ -42,7 +42,7 @@ export function MakeItYours() {
 
       <fieldset className="mt-5">
         <legend className="mb-3 text-[15px] font-semibold">Accent colour</legend>
-        <div role="radiogroup" aria-label="Accent colour" className="grid max-w-[360px] grid-cols-5 gap-1">
+        <div role="radiogroup" aria-label="Accent colour" className="grid max-w-[360px] grid-cols-5 items-start gap-1">
           {ACCENTS.map((a) => {
             const selected = prefs.accent === a.key
             return (
@@ -63,7 +63,7 @@ export function MakeItYours() {
                   )}
                   {selected && <span className="absolute -inset-[5px] rounded-full border-2" style={{ borderColor: a.fill }} aria-hidden />}
                 </span>
-                <span className={`max-w-full truncate text-[12px] leading-tight ${selected ? 'font-bold' : 'text-ink-2 font-medium'}`}>{a.label}</span>
+                <span className={`max-w-full text-center text-[12px] leading-tight [overflow-wrap:anywhere] ${selected ? 'font-bold' : 'text-ink-2 font-medium'}`}>{a.label}</span>
               </button>
             )
           })}
