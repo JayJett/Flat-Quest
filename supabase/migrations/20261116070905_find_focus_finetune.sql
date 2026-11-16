@@ -3,7 +3,7 @@
 --
 -- Additive. No existing row is modified; Home layout normalisation happens in the app on read
 -- so nobody's saved preferences are rewritten. Recovery:
--- supabase/rollback/20261116000001_find_focus_finetune_down.sql.
+-- supabase/rollback/20261116070905_find_focus_finetune_down.sql.
 
 -- ───────────────────────── 1. Notification preferences ─────────────────────────
 -- Categories a person can mute. Flat membership and ownership notices are deliberately not

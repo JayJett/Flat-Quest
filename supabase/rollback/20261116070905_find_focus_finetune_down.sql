@@ -1,4 +1,4 @@
--- EMERGENCY ONLY. Reverses 20261116000001_find_focus_finetune.sql.
+-- EMERGENCY ONLY. Reverses 20261116070905_find_focus_finetune.sql.
 -- Removes notification preferences, reminders (and their notifications) and essential amounts.
 -- Nothing from Phases 1–7 is touched. Redeploy the previous app version first.
 begin;
