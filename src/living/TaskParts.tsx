@@ -15,6 +15,7 @@ import { TickButton } from '@/motion/TickButton'
 import { useMotionLevel } from '@/personal/PreferencesProvider'
 import { dayFromToday, dueLabel } from './living'
 import { useLiving } from './LivingProvider'
+import { useUnsavedDraft } from '@/household/drafts'
 
 /** Shared completion flow: confirmed tick, friendly toast with Undo, a burst when the list is clear. */
 export function useCompleteTask() {
@@ -173,6 +174,7 @@ export function TaskQuickAdd({ autoFocus, onAdded, defaultMine }: { autoFocus?: 
   const { addTask } = useLiving()
   const toast = useToast()
   const [title, setTitle] = useState('')
+  useUnsavedDraft(title.trim().length > 0)
   const [who, setWho] = useState<string | null>(defaultMine ? (user?.id ?? null) : null)
   const [when, setWhen] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)

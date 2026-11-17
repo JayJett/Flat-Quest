@@ -27,6 +27,32 @@ export interface CommentFixture extends Row { id: string; item_id: string | null
 export interface EssentialFixture extends Row { id: string; name: string; status: 'needed' | 'getting' | 'stocked'; claimed_by: string | null; archived_at: string | null; updated_at: string }
 export interface TaskFixture extends Row { id: string; title: string; status: 'todo' | 'doing' | 'done'; assignee_id: string | null; due_on: string | null; archived_at: string | null; updated_at: string; completed_at: string | null }
 
+export interface AppointmentFixture extends Row {
+  id: string; household_id: string; title: string; notes: string | null; room_id: string | null; all_day: boolean; scheduled_on: string
+  starts_at: string | null; ends_at: string | null; needs_cover: boolean; host_id: string | null; created_by: string | null
+  cancelled_at: string | null; cancelled_by: string | null; revision: number; created_at: string; updated_at: string
+}
+export function makeAppointment(patch: Partial<AppointmentFixture> & { title: string; scheduled_on: string }): AppointmentFixture {
+  const at = stamp()
+  return {
+    id: `a0a0a0a0-a0a0-4a0a-8a0a-${String(++tick).padStart(12, '0')}`, household_id: hid, notes: null, room_id: null, all_day: true, starts_at: null, ends_at: null,
+    needs_cover: false, host_id: null, created_by: uid, cancelled_at: null, cancelled_by: null, revision: 1, created_at: at, updated_at: at, ...patch,
+  }
+}
+
+/** Local date + time in a zone → ISO instant (the fixture's stand-in for the server's conversion). */
+export function zonedFixtureInstant(date: string, time: string, zone: string): string {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number]
+  const [hh, mm] = time.split(':').map(Number) as [number, number]
+  const naive = Date.UTC(y, m - 1, d, hh, mm)
+  const offset = (t: number) => {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: zone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date(t)).map((x) => [x.type, x.value]))
+    return Date.UTC(+p.year!, +p.month! - 1, +p.day!, +p.hour! % 24, +p.minute!) - t
+  }
+  const guess = naive - offset(naive)
+  return new Date(naive - offset(guess)).toISOString()
+}
+
 export function makeEssential(patch: Partial<EssentialFixture> & { name: string }): EssentialFixture {
   const at = stamp()
   return {
@@ -76,6 +102,10 @@ export async function mockFlat(page: Page, tour = false, opts: { flatmates?: boo
     essentials: [] as EssentialFixture[], restocks: [] as Row[], tasks: [] as TaskFixture[],
     prefs: null as null | { accent: string; greeting_name: string | null; motion: string; home_layout: unknown },
     failEssential: false, failTask: false, failPrefs: false, essentialCalls: [] as Row[],
+    // Phase 10
+    settings: { timezone: 'Pacific/Auckland' } as Record<string, unknown>, failZone: false,
+    appointments: [] as AppointmentFixture[], appointmentSaves: [] as Row[], appointmentsDown: false,
+    failAppointmentSave: null as null | 'network' | 'error' | 'lost',
   }
   const user = { id: uid, aud: 'authenticated', role: 'authenticated', email: 'alex@example.invalid', app_metadata: {}, user_metadata: {}, created_at: now }
   await page.addInitScript(({ user }) => {
@@ -157,7 +187,66 @@ export async function mockFlat(page: Page, tour = false, opts: { flatmates?: boo
       const mine = { household_id: hid, user_id: uid, role: 'owner', joined_at: now }
       return send(opts.flatmates && !url.searchParams.has('user_id') ? [mine, { household_id: hid, user_id: madi, role: 'member', joined_at: '2026-11-11T01:30:00.000Z' }] : [mine])
     }
-    if (table === 'households') return send({ id: hid, name: 'Our Flat', address: null, created_by: uid, settings: {}, member_limit: state.memberLimit, photo_path: null, created_at: now, updated_at: now })
+    if (table === 'households') {
+      const flat = { id: hid, name: 'Our Flat', address: null, created_by: uid, settings: state.settings, member_limit: state.memberLimit, photo_path: null, created_at: now, updated_at: now }
+      return url.searchParams.get('id')?.startsWith('in.(') ? send([flat]) : send(flat)
+    }
+    if (table === 'set_household_timezone') {
+      if (state.failZone) return dbError('22023', 'Choose a time zone from the list')
+      state.settings = { ...state.settings, timezone: body.p_zone }
+      return send(body.p_zone)
+    }
+
+    // ---- Phase 10: shared appointments (mirrors save_appointment / set_appointment_cover / cancel_appointment).
+    if (table === 'calendar_appointments') {
+      if (state.appointmentsDown) return send({ message: 'Appointments unavailable' }, 500)
+      const list = state.appointments.filter((a) => (!q('id') || a.id === q('id')) && (q('id') || !a.cancelled_at))
+      return rows(list)
+    }
+    if (table === 'save_appointment') {
+      state.appointmentSaves.push(body)
+      if (state.failAppointmentSave === 'network') return route.abort('failed')
+      if (state.failAppointmentSave === 'error') return send({ message: 'Appointments unavailable' }, 500)
+      const zone = typeof state.settings.timezone === 'string' ? state.settings.timezone : 'Pacific/Auckland'
+      const instant = (d: string, t: string) => zonedFixtureInstant(d, t, zone)
+      const timed = body.p_start != null
+      const fields = {
+        title: String(body.p_title).trim(), notes: body.p_notes ?? null, room_id: body.p_room ?? null, all_day: !timed, scheduled_on: body.p_date,
+        starts_at: timed ? instant(body.p_date, body.p_start) : null, ends_at: timed ? instant(body.p_date, body.p_end) : null, needs_cover: !!body.p_needs_cover,
+      }
+      const existing = state.appointments.find((a) => a.id === body.p_id)
+      if (body.p_expected_revision == null) {
+        if (existing) return send(existing)
+        const row = { id: body.p_id, household_id: hid, ...fields, host_id: null, created_by: uid, cancelled_at: null, cancelled_by: null, revision: 1, created_at: stamp(), updated_at: stamp() }
+        state.appointments.push(row)
+        // The write happened, but the response never arrived.
+        if (state.failAppointmentSave === 'lost') { state.failAppointmentSave = null; return route.abort('failed') }
+        return send(row)
+      }
+      if (!existing || existing.cancelled_at) return dbError('P0002', 'That appointment was cancelled or removed', 404)
+      if (existing.revision !== body.p_expected_revision) return dbError('FQ409', 'Someone changed this appointment while you were editing')
+      const moved = existing.all_day !== fields.all_day || existing.starts_at !== fields.starts_at || existing.ends_at !== fields.ends_at || (fields.all_day && existing.scheduled_on !== fields.scheduled_on) || !fields.needs_cover
+      Object.assign(existing, fields, { host_id: moved ? null : existing.host_id, revision: existing.revision + 1, updated_at: stamp() })
+      return send(existing)
+    }
+    if (table === 'set_appointment_cover') {
+      const a = state.appointments.find((x) => x.id === body.p_id)
+      if (!a || a.cancelled_at) return dbError('P0002', 'That appointment isn’t available', 404)
+      if (body.p_action === 'claim') {
+        if (a.host_id === uid) return send(a)
+        if (a.revision !== body.p_expected_revision) return dbError('FQ409', 'This appointment changed. Check the new time before volunteering.')
+        if (a.host_id) return dbError('FQ409', 'Madi is already going to be home')
+        Object.assign(a, { host_id: uid, revision: a.revision + 1, updated_at: stamp() })
+      } else if (a.host_id === uid) Object.assign(a, { host_id: null, revision: a.revision + 1, updated_at: stamp() })
+      return send(a)
+    }
+    if (table === 'cancel_appointment') {
+      const a = state.appointments.find((x) => x.id === body.p_id)
+      if (!a) return dbError('P0002', 'That appointment isn’t available', 404)
+      if (a.revision !== body.p_expected_revision) return dbError('FQ409', 'Someone changed this appointment. Check it before cancelling.')
+      Object.assign(a, { cancelled_at: stamp(), cancelled_by: uid, host_id: null, revision: a.revision + 1, updated_at: stamp() })
+      return send(a)
+    }
     if (table === 'rooms') {
       if (method === 'PATCH') {
         state.roomPatches.push(body)

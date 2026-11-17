@@ -16,8 +16,9 @@ import type { HouseholdMemberRow, HouseholdRow, ItemAssigneeRow, ItemRow, Profil
 import { toItem, type Household, type Item, type Member, type Profile, type Room } from '@/lib/domain'
 import { completionMilestone } from '@/lib/celebrations'
 import { errorMessage, supabase } from '@/lib/supabase'
+import { MembershipProvider, useMemberships } from './MembershipProvider'
 
-export type LoadState = 'loading' | 'no-household' | 'ready' | 'error'
+export type LoadState = 'loading' | 'no-household' | 'choose' | 'ready' | 'error'
 export type SyncState = 'connecting' | 'live' | 'reconnecting'
 
 export type ItemPatch = Partial<
@@ -71,6 +72,8 @@ interface HouseholdState {
   // Profile & household
   updateProfile: (patch: ProfilePatch) => Promise<Result>
   updateHousehold: (patch: { name?: string; address?: string | null }) => Promise<Result>
+  /** Owner only. Validated by the server; other settings are preserved. */
+  setTimeZone: (zone: string) => Promise<Result>
   /** Upload (or remove, with null) the shared household photo. */
   setHouseholdPhoto: (photo: Blob | null, ext?: 'webp' | 'jpg') => Promise<Result>
   createHousehold: (name: string, address: string) => Promise<Result<string>>
@@ -78,14 +81,26 @@ interface HouseholdState {
 }
 
 const HouseholdContext = createContext<HouseholdState | null>(null)
-const ACTIVE_KEY = 'flatquest.activeHousehold'
 
 function byOrder<T extends { sort_order: number; created_at: string }>(a: T, b: T) {
   return a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at)
 }
 
-export function HouseholdProvider({ children }: { children: ReactNode }) {
+/** True when the server says this flat isn't ours (no row under RLS, or permission denied). */
+function isAccessError(e: unknown) {
+  const err = e as { code?: string } | null
+  return err?.code === 'PGRST116' || err?.code === '42501'
+}
+
+/**
+ * Everything for ONE flat. Mounted with `key={householdId}`, so switching flats discards every
+ * piece of this flat's state, subscription and in-flight response at once.
+ */
+export function HouseholdProvider({ householdId: activeHouseholdId, children }: { householdId: string | null; children: ReactNode }) {
   const { user } = useAuth()
+  const membership = useMemberships()
+  const membershipRef = useRef(membership)
+  useEffect(() => { membershipRef.current = membership })
   const toast = useToast()
   const celebration = useCelebration()
   const userId = user?.id ?? null
@@ -160,34 +175,24 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     if (!userId) return
     lastLoad.current = Date.now()
     try {
-      const [{ data: profile, error: pErr }, { data: memberships, error: mErr }] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
-        supabase.from('household_members').select('household_id, joined_at').eq('user_id', userId).order('joined_at'),
-      ])
-      if (pErr ?? mErr) throw pErr ?? mErr
+      const { data: profile, error: pErr } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
+      if (pErr) throw pErr
       setMe(profile)
-      if (!memberships || memberships.length === 0) {
-        householdIdRef.current = null
-        setHousehold(null)
-        setState('no-household')
-        return
-      }
-      let preferred: string | null = null
-      try {
-        preferred = localStorage.getItem(ACTIVE_KEY)
-      } catch {
-        /* storage unavailable */
-      }
-      const chosen = memberships.find((m) => m.household_id === preferred) ?? memberships[0]!
-      householdIdRef.current = chosen.household_id
-      await loadHouseholdData(chosen.household_id)
+      if (!activeHouseholdId) return
+      householdIdRef.current = activeHouseholdId
+      await loadHouseholdData(activeHouseholdId)
       setLoadError(null)
       setState('ready')
     } catch (e) {
+      // Access ended (removed, flat deleted): let memberships decide where to go next.
+      if (isAccessError(e)) {
+        void membershipRef.current.refresh()
+        return
+      }
       setLoadError(errorMessage(e))
       setState((s) => (s === 'ready' ? s : 'error'))
     }
-  }, [userId, loadHouseholdData])
+  }, [userId, activeHouseholdId, loadHouseholdData])
 
   // Initial load whenever the signed-in user changes.
   // (The provider is keyed by user id, so a different user always gets fresh state.)
@@ -264,10 +269,10 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     const onMember = (payload: RealtimePostgresChangesPayload<HouseholdMemberRow>) => {
       const old = payload.old as Partial<HouseholdMemberRow>
       if (payload.eventType === 'DELETE' && old.user_id === userId) {
-        // Removed (or left on another device): access has already ended server-side.
-        // Reload from scratch so every screen drops this flat's data.
-        if (old.household_id && old.household_id !== householdId) return
-        void load()
+        // Removed (or left on another device): access has already ended server-side. Memberships
+        // decide where to go next, and this flat's state is discarded with this provider.
+        // (Removal from one of your other flats also refreshes the list of flats.)
+        void membershipRef.current.refresh()
         return
       }
       if (payload.eventType === 'DELETE' && old.household_id && old.household_id !== householdId) return
@@ -320,8 +325,9 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       if (document.visibilityState !== 'visible') return
       if (Date.now() - lastLoad.current < 30_000) return
       void load()
+      void membershipRef.current.refresh()
     }
-    const online = () => void load()
+    const online = () => { void load(); void membershipRef.current.refresh() }
     document.addEventListener('visibilitychange', refresh)
     window.addEventListener('online', online)
     return () => {
@@ -519,6 +525,15 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     return { ok: true, data: undefined }
   }, [])
 
+  const setTimeZone = useCallback<HouseholdState['setTimeZone']>(async (zone) => {
+    const hid = householdIdRef.current
+    if (!hid) return { ok: false, error: 'No household' }
+    const { error } = await supabase.rpc('set_household_timezone', { p_household: hid, p_zone: zone })
+    if (error) return { ok: false, error: errorMessage(error) }
+    setHousehold((h) => (h ? { ...h, settings: { ...((h.settings as Record<string, unknown> | null) ?? {}), timezone: zone } } : h))
+    return { ok: true, data: undefined }
+  }, [])
+
   const setHouseholdPhoto = useCallback<HouseholdState['setHouseholdPhoto']>(async (photo, ext = 'webp') => {
     const hid = householdIdRef.current
     if (!hid) return { ok: false, error: 'No household' }
@@ -540,35 +555,9 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     return { ok: true, data: undefined }
   }, [])
 
-  const createHousehold = useCallback<HouseholdState['createHousehold']>(
-    async (name, address) => {
-      const { data, error } = await supabase.rpc('create_household', { p_name: name, p_address: address })
-      if (error || !data) return { ok: false, error: errorMessage(error) }
-      try {
-        localStorage.setItem(ACTIVE_KEY, data)
-      } catch {
-        /* ignore */
-      }
-      await load()
-      return { ok: true, data }
-    },
-    [load],
-  )
-
-  const acceptInvite = useCallback<HouseholdState['acceptInvite']>(
-    async (code) => {
-      const { data, error } = await supabase.rpc('accept_household_invite', { p_code: code })
-      if (error || !data) return { ok: false, error: errorMessage(error) }
-      try {
-        localStorage.setItem(ACTIVE_KEY, data)
-      } catch {
-        /* ignore */
-      }
-      await load()
-      return { ok: true, data }
-    },
-    [load],
-  )
+  // Creating or joining never switches by itself: the caller selects the flat when it's ready.
+  const createHousehold = membership.createHousehold
+  const acceptInvite = membership.acceptInvite
 
   const members = useMemo<Member[]>(() => {
     return memberRows
@@ -599,7 +588,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   )
 
   const reload = useCallback(async () => {
-    await load()
+    await Promise.all([load(), membershipRef.current.refresh()])
   }, [load])
 
   // Surface background sync failures once rather than silently.
@@ -609,10 +598,17 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     lastError.current = loadError
   }, [loadError, state, toast])
 
+  // Without an active flat, the account's memberships decide what to show.
+  const shownState: LoadState = activeHouseholdId ? state
+    : membership.status === 'loading' ? 'loading'
+      : membership.status === 'error' ? 'error'
+        : membership.needsChoice ? 'choose' : 'no-household'
+  const shownError = activeHouseholdId ? loadError : membership.error
+
   const value = useMemo<HouseholdState>(
     () => ({
-      state,
-      loadError,
+      state: shownState,
+      loadError: shownError,
       sync,
       me,
       household,
@@ -632,13 +628,14 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       reorderRooms,
       updateProfile,
       updateHousehold,
+      setTimeZone,
       setHouseholdPhoto,
       createHousehold,
       acceptInvite,
     }),
     [
-      state,
-      loadError,
+      shownState,
+      shownError,
       sync,
       me,
       household,
@@ -658,6 +655,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       reorderRooms,
       updateProfile,
       updateHousehold,
+      setTimeZone,
       setHouseholdPhoto,
       createHousehold,
       acceptInvite,
@@ -667,10 +665,22 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   return <HouseholdContext.Provider value={value}>{children}</HouseholdContext.Provider>
 }
 
-/** Remounts the household store whenever the signed-in user changes. */
+/**
+ * Account → memberships → one flat. A different user remounts everything; a different flat
+ * remounts everything household-specific (data, subscriptions, providers, open sheets).
+ */
 export function UserScopedHouseholdProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
-  return <HouseholdProvider key={user?.id ?? 'signed-out'}>{children}</HouseholdProvider>
+  return (
+    <MembershipProvider key={user?.id ?? 'signed-out'}>
+      <ActiveHousehold>{children}</ActiveHousehold>
+    </MembershipProvider>
+  )
+}
+
+function ActiveHousehold({ children }: { children: ReactNode }) {
+  const { activeId } = useMemberships()
+  return <HouseholdProvider key={activeId ?? 'none'} householdId={activeId}>{children}</HouseholdProvider>
 }
 
 export function useHousehold(): HouseholdState {

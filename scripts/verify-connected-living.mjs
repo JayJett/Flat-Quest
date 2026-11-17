@@ -191,6 +191,52 @@ await waitFor(() => p9.bRooms.some((p) => p.new?.id === room.id && p.new.cover_v
 pass(true, 'deleting the photo clears the cover live, keeping the description')
 pass(!p9.cRooms.some((p) => p.new?.household_id === hid || p.old?.id === room.id), 'outsiders receive no room changes from this flat')
 
+// 4e. Phase 10: shared appointments and coverage, live across sessions; flats stay separate.
+const p10 = { bAppt: [], aAllAppt: [], cAppt: [] }
+await Promise.all([
+  listen(B, 'b', 'calendar_appointments', `household_id=eq.${hid}`, p10.bAppt),
+  listen(A, 'a', 'calendar_appointments', null, p10.aAllAppt),
+  listen(C, 'c', 'calendar_appointments', null, p10.cAppt),
+])
+const apptId = randomUUID()
+const save = (client, rev, day, start, end, cover = true, id = apptId, flat = hid) => client.rpc('save_appointment', {
+  p_id: id, p_household: flat, p_expected_revision: rev, p_title: 'Inspection', p_notes: null, p_room: null,
+  p_date: day, p_start: start, p_end: end, p_needs_cover: cover,
+})
+let appt = ok(await save(A, null, '2026-12-02', '10:00', '11:00'), 'create appointment')
+await waitFor(() => p10.bAppt.some((p) => p.new?.id === apptId), 'appointment insert')
+pass(true, 'a new appointment appears live for a flatmate')
+const retry = ok(await save(A, null, '2026-12-02', '10:00', '11:00'), 'retry create')
+pass(retry.revision === 1 && (await A.from('calendar_appointments').select('id').eq('id', apptId)).data.length === 1, 'retrying a create (unclear response) never duplicates')
+appt = ok(await B.rpc('set_appointment_cover', { p_id: apptId, p_expected_revision: appt.revision, p_action: 'claim' }), 'claim')
+await waitFor(() => p10.aAllAppt.some((p) => p.new?.id === apptId && p.new.host_id === blair.id), 'claim sync')
+pass(true, 'volunteering to be home reaches the other flatmate live')
+const twice = await A.rpc('set_appointment_cover', { p_id: apptId, p_expected_revision: appt.revision, p_action: 'claim' })
+pass(twice.error?.code === 'FQ409', 'a second volunteer from another session is refused')
+const claimedRev = appt.revision
+appt = ok(await save(A, appt.revision, '2026-12-03', '10:00', '11:00'), 'reschedule')
+await waitFor(() => p10.bAppt.some((p) => p.new?.id === apptId && p.new.host_id === null && p.new.scheduled_on === '2026-12-03'), 'reschedule sync')
+pass(true, 'moving it reopens coverage, and the volunteer sees that live')
+const staleClaim = await B.rpc('set_appointment_cover', { p_id: apptId, p_expected_revision: claimedRev, p_action: 'claim' })
+pass(staleClaim.error?.code === 'FQ409', 'a claim made against the old slot is refused')
+const outsiderClaim = await C.rpc('set_appointment_cover', { p_id: apptId, p_expected_revision: appt.revision, p_action: 'claim' })
+pass(Boolean(outsiderClaim.error) && (await C.from('calendar_appointments').select('id').eq('id', apptId)).data.length === 0, 'an outsider can neither see nor claim it')
+const direct = await A.from('calendar_appointments').update({ host_id: avery.id }).eq('id', apptId)
+pass(Boolean(direct.error), 'direct writes are refused even for members')
+// A person in two flats: Blair's own flat stays separate from this one.
+const blairFlat = ok(await B.rpc('create_household', { p_name: 'Blair’s new place', p_address: '' }), 'second flat')
+const elsewhere = randomUUID()
+ok(await save(B, null, '2026-12-02', null, null, false, elsewhere, blairFlat), 'appointment in second flat')
+await sleep(1500)
+pass(!p10.aAllAppt.some((p) => p.new?.id === elsewhere), 'appointments in a flatmate’s other flat never reach this flat')
+pass(!p10.cAppt.some((p) => p.new?.household_id === hid), 'outsiders receive no appointment changes from this flat')
+// Signed photo links: a member can sign; after removal, new links are refused (checked below).
+const reserved = ok(await A.rpc('reserve_media_upload', { p_household: hid, p_kind: 'visual', p_ext: 'webp' }), 'reserve photo')
+const upload = await A.storage.from('household-media').upload(reserved.path, new Blob([new Uint8Array([82, 73, 70, 70])], { type: 'image/webp' }), { contentType: 'image/webp' })
+if (upload.error) throw new Error(`upload: ${upload.error.message}`)
+const signedBefore = await B.storage.from('household-media').createSignedUrl(reserved.path, 60)
+pass(Boolean(signedBefore.data?.signedUrl), 'a member can get a signed link to a flat photo')
+
 // 5. Removal takes effect immediately, including for the removed person's open session.
 ok(await A.rpc('remove_household_member', { p_household: hid, p_user: blair.id }), 'remove')
 await waitFor(() => seen.bMembers.some((p) => p.old?.user_id === blair.id), 'membership delete event')
@@ -199,6 +245,15 @@ const after = await B.from('items').select('id').eq('household_id', hid)
 pass((after.data ?? []).length === 0, 'removed member can no longer read the flat')
 const stillOwner = (await A.from('household_members').select('role').eq('household_id', hid).eq('user_id', avery.id).single()).data
 pass(stillOwner?.role === 'owner', 'owner unaffected')
+
+// 5b. Phase 10: after removal the old session gets nothing new, and can't sign new photo links.
+const seenBefore = p10.bAppt.length
+ok(await A.rpc('set_appointment_cover', { p_id: apptId, p_expected_revision: appt.revision, p_action: 'claim' }), 'owner claims after removal')
+await waitFor(() => p10.aAllAppt.some((p) => p.new?.id === apptId && p.new.host_id === avery.id), 'owner claim sync')
+await sleep(1500)
+pass(p10.bAppt.length === seenBefore, 'a removed member’s open session receives no further appointment changes')
+const signedAfter = await B.storage.from('household-media').createSignedUrl(reserved.path, 60)
+pass(!signedAfter.data?.signedUrl, 'a removed member cannot get new signed photo links')
 
 for (const client of [A, B, B2, C]) await client.removeAllChannels()
 console.log(`${checks} real Realtime/REST checks passed with independent sessions. Fixtures are discarded with the local stack.`)

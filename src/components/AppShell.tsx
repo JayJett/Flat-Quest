@@ -1,4 +1,5 @@
 import {
+  CalendarDays,
   Compass,
   Gift,
   House,
@@ -24,6 +25,8 @@ import { Avatar, clearMediaCache } from './Avatar'
 import { useFocusTrap } from './Sheet'
 import { TourProvider, useTour } from './Tour'
 import { useOpenEvent } from '@/activity/useOpenEvent'
+import { FlatSwitcher } from '@/household/FlatSwitcher'
+import { forgetRoomCovers } from '@/rooms/useRoomCover'
 import { LivingProvider } from '@/living/LivingProvider'
 import { SearchOverlay } from '@/search/SearchOverlay'
 import { IconButton } from './ui'
@@ -62,7 +65,9 @@ export function AppShell() {
 
 function Shell() {
   const { household } = useHousehold()
-  useEffect(() => () => { clearMediaCache() }, [household?.id])
+  // Leaving a flat (switch, removal, sign-out) forgets its signed photo links and cover lookups;
+  // late answers to requests already in flight are discarded by the cache's generation check.
+  useEffect(() => () => { clearMediaCache(); forgetRoomCovers() }, [household?.id])
   const [drawerOpen, setDrawerOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
@@ -319,7 +324,7 @@ function SideRail() {
         </div>
       </NavLink>
       <nav aria-label="Primary" className="mt-8 flex flex-col gap-1">
-        {[...PRIMARY_NAV, { to: '/settings', label: 'Settings', icon: Settings, end: false }].map(
+        {[...PRIMARY_NAV, { to: '/calendar', label: 'Calendar', icon: CalendarDays, end: false }, { to: '/settings', label: 'Settings', icon: Settings, end: false }].map(
           ({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
@@ -336,12 +341,16 @@ function SideRail() {
           ),
         )}
       </nav>
+      <div className="mt-8 -mx-2 overflow-y-auto">
+        <FlatSwitcher compact />
+      </div>
     </aside>
   )
 }
 
 const DRAWER_LINKS: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
   ...PRIMARY_NAV,
+  { to: '/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/profile', label: 'Profile', icon: UserRound },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
@@ -407,7 +416,11 @@ function Drawer({ open, onClose }: { open: boolean; onClose: () => void }) {
                 {household?.name ?? 'No household yet'}
               </p>
             </div>
-            <nav aria-label="Menu" className="flex-1 overflow-y-auto px-3">
+            <div className="flex-1 overflow-y-auto">
+            <div className="px-3 pb-4">
+              <FlatSwitcher onSwitched={onClose} />
+            </div>
+            <nav aria-label="Menu" className="px-3">
               <ul className="flex flex-col">
                 {DRAWER_LINKS.map(({ to, label, icon: LinkIcon, end }) => (
                   <li key={to}>
@@ -425,6 +438,7 @@ function Drawer({ open, onClose }: { open: boolean; onClose: () => void }) {
                 ))}
               </ul>
             </nav>
+            </div>
             <div className="px-3">
               <button
                 type="button"

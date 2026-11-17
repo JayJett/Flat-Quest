@@ -74,6 +74,8 @@ jobs:
         run: psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -v ON_ERROR_STOP=1 -f supabase/tests/phase8_verification.sql
       - name: Feels like home (room covers, descriptions, one reminder per run)
         run: psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -v ON_ERROR_STOP=1 -f supabase/tests/phase9_verification.sql
+      - name: The shared week (flat time zones, appointments, coverage)
+        run: psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -v ON_ERROR_STOP=1 -f supabase/tests/phase10_verification.sql
       - name: Real private Storage API isolation
         run: |
           supabase status -o json > "$RUNNER_TEMP/local-supabase.json"

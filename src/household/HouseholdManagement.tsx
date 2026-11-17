@@ -9,6 +9,7 @@ import { Button, IconButton } from '@/components/ui'
 import type { Member } from '@/lib/domain'
 import { errorMessage, supabase } from '@/lib/supabase'
 import { useHousehold } from './HouseholdProvider'
+import { useMemberships } from './MembershipProvider'
 
 type Summary = { assigned: number; sole: number; coordinating: number }
 type Pending = { kind: 'remove' | 'transfer' | 'leave'; member: Member; summary: Summary | null }
@@ -37,6 +38,7 @@ export function departureCopy(name: string, s: Summary | null, self: boolean): s
 export function HouseholdManagement() {
   const { user } = useAuth()
   const { household, members, reload } = useHousehold()
+  const { refresh: refreshMemberships } = useMemberships()
   const toast = useToast()
   const navigate = useNavigate()
   const [pending, setPending] = useState<Pending | null>(null)
@@ -78,8 +80,9 @@ export function HouseholdManagement() {
     const name = member.profile.display_name || 'Your flatmate'
     if (kind === 'leave') {
       toast.show(`You’ve left ${household.name}`)
-      await reload()
       navigate('/', { replace: true })
+      // Memberships pick the next flat (or onboarding); this flat's screens unmount with it.
+      await refreshMemberships({ quiet: true })
       return
     }
     toast.success(kind === 'remove' ? `${name} is no longer in the flat` : `${name} is now the flat owner`)

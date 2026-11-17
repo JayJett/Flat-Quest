@@ -16,6 +16,7 @@ import { TickButton } from '@/motion/TickButton'
 import { useMotionLevel } from '@/personal/PreferencesProvider'
 import { ESSENTIAL_CATEGORIES, essentialSuggestions, isActiveEssential, matchEssential, type EssentialCategory } from './living'
 import { useLiving } from './LivingProvider'
+import { useUnsavedDraft } from '@/household/drafts'
 
 /** Shared restock flow: tick, friendly confirmation with Undo, and a burst when the list is cleared. */
 export function useRestock() {
@@ -125,6 +126,7 @@ export function EssentialQuickAdd({ autoFocus, onAdded }: { autoFocus?: boolean;
   const { essentials, addEssential, status } = useLiving()
   const toast = useToast()
   const [text, setText] = useState('')
+  useUnsavedDraft(text.trim().length > 0)
   // Suggestions depend on what's already on the list, so wait for it rather than flash wrong chips.
   const ready = status === 'ready'
   const [busy, setBusy] = useState(false)

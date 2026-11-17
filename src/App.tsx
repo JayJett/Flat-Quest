@@ -30,6 +30,8 @@ const SettingsPage = lazy(() => import('@/pages/Settings').then((m) => ({ defaul
 const SignInPage = lazy(() => import('@/pages/SignIn').then((m) => ({ default: m.SignInPage })))
 const JoinPage = lazy(() => import('@/pages/Welcome').then((m) => ({ default: m.JoinPage })))
 const WelcomePage = lazy(() => import('@/pages/Welcome').then((m) => ({ default: m.WelcomePage })))
+const ChooseFlatPage = lazy(() => import('@/pages/Welcome').then((m) => ({ default: m.ChooseFlatPage })))
+const CalendarPage = lazy(() => import('@/pages/Calendar').then((m) => ({ default: m.CalendarPage })))
 const WishlistPage = lazy(() => import('@/pages/Wishlist').then((m) => ({ default: m.WishlistPage })))
 
 function Providers() {
@@ -60,6 +62,7 @@ const router = createBrowserRouter([
       { path: '/auth/reset', element: <ResetPasswordPage /> },
       { path: '/welcome', element: <RequireAuth><WelcomePage /></RequireAuth> },
       { path: '/join', element: <RequireAuth><JoinPage /></RequireAuth> },
+      { path: '/flats', element: <RequireAuth><ChooseFlatPage /></RequireAuth> },
       {
         element: (
           <RequireAuth>
@@ -82,6 +85,7 @@ const router = createBrowserRouter([
           { path: 'activity', element: <ActivityPage /> },
           { path: 'essentials', element: <EssentialsPage /> },
           { path: 'tasks', element: <TasksPage /> },
+          { path: 'calendar', element: <CalendarPage /> },
         ],
       },
       { path: '*', element: <Navigate to="/" replace /> },

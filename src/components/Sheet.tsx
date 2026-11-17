@@ -162,6 +162,7 @@ export function ConfirmSheet({
   title,
   body,
   confirmLabel,
+  cancelLabel = 'Cancel',
   danger,
   busy,
   onConfirm,
@@ -171,6 +172,7 @@ export function ConfirmSheet({
   title: string
   body: string
   confirmLabel: string
+  cancelLabel?: string
   danger?: boolean
   busy?: boolean
   onConfirm: () => void
@@ -190,7 +192,7 @@ export function ConfirmSheet({
           {busy ? 'Working…' : confirmLabel}
         </button>
         <button type="button" disabled={busy} onClick={onClose} className="pressable bg-surface-2 min-h-12 rounded-2xl font-semibold">
-          Cancel
+          {cancelLabel}
         </button>
       </div>
     </Sheet>

@@ -55,6 +55,27 @@ export type HouseholdInviteRow = {
   created_at: string
 }
 
+/** Phase 10: a shared appointment (inspection, meter reading…), optionally needing someone home. */
+export type AppointmentRow = {
+  id: string
+  household_id: string
+  title: string
+  notes: string | null
+  room_id: string | null
+  all_day: boolean
+  scheduled_on: string
+  starts_at: string | null
+  ends_at: string | null
+  needs_cover: boolean
+  host_id: string | null
+  created_by: string | null
+  cancelled_at: string | null
+  cancelled_by: string | null
+  revision: number
+  created_at: string
+  updated_at: string
+}
+
 export type RoomRow = {
   id: string
   household_id: string
@@ -343,6 +364,7 @@ export type Database = {
       essentials: Table<EssentialRow, 'household_id' | 'name'>
       essential_restocks: Table<EssentialRestockRow, 'essential_id' | 'household_id' | 'prior_status'>
       household_tasks: Table<TaskRow, 'household_id' | 'title'>
+      calendar_appointments: Table<AppointmentRow, 'id' | 'household_id' | 'title' | 'all_day' | 'scheduled_on'>
       user_preferences: Table<UserPreferencesRow, never>
     }
     Views: { [_ in never]: never }
@@ -377,6 +399,16 @@ export type Database = {
         Returns: EssentialRow
       }
       leave_household: { Args: { p_household: string }; Returns: Json }
+      set_household_timezone: { Args: { p_household: string; p_zone: string }; Returns: string }
+      save_appointment: {
+        Args: {
+          p_id: string; p_household: string; p_expected_revision: number | null; p_title: string; p_notes: string | null
+          p_room: string | null; p_date: string; p_start: string | null; p_end: string | null; p_needs_cover: boolean
+        }
+        Returns: AppointmentRow
+      }
+      set_appointment_cover: { Args: { p_id: string; p_expected_revision: number; p_action: 'claim' | 'release' }; Returns: AppointmentRow }
+      cancel_appointment: { Args: { p_id: string; p_expected_revision: number }; Returns: AppointmentRow }
       remove_household_member: { Args: { p_household: string; p_user: string }; Returns: Json }
       transfer_household_ownership: { Args: { p_household: string; p_user: string }; Returns: undefined }
       set_member_limit: { Args: { p_household: string; p_limit: number }; Returns: undefined }
