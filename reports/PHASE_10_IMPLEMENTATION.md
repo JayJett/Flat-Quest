@@ -1,6 +1,6 @@
 # Phase 10: the shared week
 
-**Implementation report.** Local branch `phase-10-shared-week`, from `79f0cb3`. **Status: an uncommitted diff, awaiting review.** Nothing has been committed, pushed, provisioned, migrated or deployed. The live flat and its project (`ivnovvdpkxrqsmsiqhid`) are untouched; the only production access was one read-only sizing query for the cost estimate.
+**Implementation report.** Developed on `phase-10-shared-week` from `79f0cb3`. **Status: released on 18 November 2026** with the owner's approval at each step (§12). PR https://github.com/JayJett/Flat-Quest/pull/11 was merged as `651cead`. Production migration `20261118004453_shared_week`. Deployed to https://jayjett.github.io/Flat-Quest/.
 
 Companion documents:
 - `reports/PHASE_10_BASELINE.md`
@@ -124,7 +124,7 @@ All storage access is optional: if storage is blocked, the person simply chooses
 
 ## 6. Appointment schema, RLS, grants, indexing and concurrency
 
-Migration: `supabase/migrations/20261118004453_shared_week.sql` (to be renamed to its production version on apply). Rollback: `supabase/rollback/20261118004453_shared_week_down.sql`.
+Migration: `supabase/migrations/20261118004453_shared_week.sql` (the version recorded in production). Rollback: `supabase/rollback/20261118004453_shared_week_down.sql`.
 
 **`calendar_appointments`**
 - `id` is the client's per-draft UUID.
@@ -304,3 +304,20 @@ Each is a separately approved milestone. Native packaging, Apple provider setup,
 | 9 | Any iOS or TestFlight work | — | **A separate decision and milestone** |
 
 The backend goes first, and the frontend second: the Phase 9 web app ignores the new table and functions, so step 5 is safe before step 7. To undo step 7, revert the merge (Pages republishes the previous build) and keep the schema and any appointments.
+
+## 13. Release record (18 November 2026)
+
+| Step | Evidence |
+|---|---|
+| Commit and push (approved) | `6bfbe1a` on `phase-10-shared-week`; draft PR https://github.com/JayJett/Flat-Quest/pull/11 |
+| First CI run | The real Realtime and Storage job **passed: 42 checks**, including every Phase 10 one (live appointment sync, single volunteer, a reschedule reopening coverage, flats kept separate, a removed member receiving no further changes and no new signed photo links). The small-iPhone WebKit project passed except for one older Phase 6 test |
+| CI fix | `0b149cb`. The Phase 6 drawer test seeded "today" notifications 30 minutes back, so it failed in the half hour after midnight UTC. Reproduced at a simulated 00:10 UTC (expected 2, got 1), fixed and re-verified. CI then went fully green |
+| Production snapshot (read-only) | 1 flat, 3 members, 11 rooms, 108 items, 24 photos, 65 events, 54 notifications; md5 fingerprints of households, members, rooms, items and photos; 3 active scheduled jobs |
+| Production migration (approved) | Applied through the Supabase connector and recorded as `20261118004453` |
+| Post-migration verification (read-only) | Every count and fingerprint identical. The appointments table has RLS and is in the Realtime publication, with no direct insert or update by signed-in users and no anonymous access. Private helpers are not executable by signed-in users. 3 jobs active. The flat reads as Pacific/Auckland. The advisor adds only the 4 intended member-checked RPCs |
+| Rename | `17c6eee`: migration and rollback renamed to `20261118004453`; CI green |
+| Merge (approved) | PR #11 merged as `651cead` |
+| Deploy | Main run 44211928634: Check and build, Local database access tests and Publish all succeeded. Pages deployment for `651cead` at 01:06 UTC: **success** |
+
+**Not done.** No physical-iPhone testing was possible. The live site can't be opened from this environment (its network policy blocks `jayjett.github.io`), so the release is verified through GitHub's deployment status.
+
