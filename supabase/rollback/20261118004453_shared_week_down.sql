@@ -1,4 +1,4 @@
--- EMERGENCY ONLY. Reverses 20261117100001_shared_week.sql.
+-- EMERGENCY ONLY. Reverses 20261118004453_shared_week.sql.
 --
 -- Prefer reverting the frontend and KEEPING this schema: it is additive, and the previous app
 -- ignores it. Run this only if the schema itself must go, and only after exporting appointments:

@@ -124,7 +124,7 @@ All storage access is optional: if storage is blocked, the person simply chooses
 
 ## 6. Appointment schema, RLS, grants, indexing and concurrency
 
-Migration: `supabase/migrations/20261117100001_shared_week.sql` (to be renamed to its production version on apply). Rollback: `supabase/rollback/20261117100001_shared_week_down.sql`.
+Migration: `supabase/migrations/20261118004453_shared_week.sql` (to be renamed to its production version on apply). Rollback: `supabase/rollback/20261118004453_shared_week_down.sql`.
 
 **`calendar_appointments`**
 - `id` is the client's per-draft UUID.

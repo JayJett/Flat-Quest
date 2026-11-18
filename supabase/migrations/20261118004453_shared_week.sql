@@ -1,7 +1,7 @@
 -- Phase 10 — The shared week: per-flat time zones and shared appointments with optional coverage.
 --
 -- Additive. No existing row is modified. Existing flats without a valid time zone keep
--- behaving as Pacific/Auckland. Recovery: supabase/rollback/20261117100001_shared_week_down.sql.
+-- behaving as Pacific/Auckland. Recovery: supabase/rollback/20261118004453_shared_week_down.sql.
 
 -- ───────────────────────── 1. One validated time zone per flat ─────────────────────────
 -- A flat's calendar day and week, and reminder timing, follow its IANA time zone. Before
