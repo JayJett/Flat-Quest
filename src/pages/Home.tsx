@@ -1,4 +1,4 @@
-import { ArrowRight, ChevronRight, Plus, ShoppingBag, ShoppingBasket, SlidersHorizontal, Truck } from 'lucide-react'
+import { ArrowRight, ChevronRight, Plus, ShoppingBag, ShoppingBasket, SlidersHorizontal, Truck, CalendarDays } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
@@ -362,6 +362,19 @@ function ProgressSection() {
           <ChevronRight size={18} className="text-ink-3 shrink-0" aria-hidden />
         </Link>
       )}
+      {/* The shared week sits after progress, never before it. */}
+      <Link
+        to="/calendar"
+        className="pressable bg-surface-2 active:bg-surface-3 mt-3 flex min-h-[68px] items-center gap-3.5 rounded-[var(--radius-card)] px-5 py-3"
+        data-testid="home-calendar-link"
+      >
+        <CalendarDays size={24} strokeWidth={1.9} className="shrink-0" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[17px] leading-snug font-bold">This week</span>
+          <span className="text-ink-2 block truncate text-[15px]">Tasks, deliveries and appointments</span>
+        </span>
+        <ChevronRight size={18} className="text-ink-3 shrink-0" aria-hidden />
+      </Link>
     </div>
   )
 }

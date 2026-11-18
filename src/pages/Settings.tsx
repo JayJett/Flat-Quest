@@ -12,23 +12,37 @@ import { bundledChecklist, runImport } from '@/household/importChecklist'
 import { useHousehold } from '@/household/HouseholdProvider'
 import { MakeItYours } from '@/personal/MakeItYours'
 import { NotificationSettings } from '@/personal/NotificationSettings'
+import { useUnsavedDraft } from '@/household/drafts'
+import { flatZone } from '@/calendar/dates'
+import { TimeZoneSelect } from '@/calendar/TimeZoneSelect'
 
 export function SettingsPage() {
   const { user, signOut } = useAuth()
-  const { household, members, updateHousehold, reload } = useHousehold()
+  const { household, members, updateHousehold, setTimeZone, reload } = useHousehold()
   const toast = useToast()
   const navigate = useNavigate()
-  const ids = { name: useId(), address: useId() }
+  const ids = { name: useId(), address: useId(), zone: useId() }
   const isOwner = members.some((m) => m.userId === user?.id && m.role === 'owner')
   const [name, setName] = useState(household?.name ?? '')
   const [address, setAddress] = useState(household?.address ?? '')
   const [saving, setSaving] = useState(false)
+  const zone = flatZone(household?.settings)
+  const [zoneSaving, setZoneSaving] = useState(false)
+  const changeZone = async (next: string) => {
+    if (next === zone) return
+    setZoneSaving(true)
+    const res = await setTimeZone(next)
+    setZoneSaving(false)
+    if (!res.ok) toast.error(res.error)
+    else toast.success(`Time zone set to ${next.replace(/_/g, ' ')}`)
+  }
   const [pending, setPending] = useState<{ rows: ImportRow[]; warnings: string[]; source: string } | null>(null)
   const [importing, setImporting] = useState(false)
   const [confirmSignOut, setConfirmSignOut] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const dirty = household && (name.trim() !== household.name || (address.trim() || null) !== household.address)
+  useUnsavedDraft(Boolean(dirty))
 
   const saveHousehold = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -99,6 +113,11 @@ export function SettingsPage() {
               </Button>
             )}
           </form>
+          <div className="mt-4">
+            <Field label="Time zone" htmlFor={ids.zone} hint={isOwner ? 'Sets the flat’s calendar week and reminder times for everyone. Booked appointment times stay at the same moment.' : 'Set by the person who set up the flat.'}>
+              <TimeZoneSelect id={ids.zone} value={zone} disabled={!isOwner || zoneSaving} onChange={(z) => void changeZone(z)} />
+            </Field>
+          </div>
           <Link to="/flatmates" className="pressable active:bg-surface-2 -mx-2 mt-4 flex min-h-14 items-center justify-between rounded-2xl px-2 font-semibold">
             Flatmates and invites
             <ChevronRight size={20} className="text-ink-3" aria-hidden />

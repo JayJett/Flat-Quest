@@ -1,13 +1,15 @@
-import { ArrowRight, Link2, LogOut } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Link2, LogOut } from 'lucide-react'
 import { useEffect, useId, useMemo, useState } from 'react'
-import { Navigate, useNavigate, useSearchParams } from 'react-router'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import { useAuth } from '@/auth/AuthProvider'
-import { FullScreenLoader } from '@/auth/guards'
+import { FullScreenLoader, safeNext } from '@/auth/guards'
 import { Switch } from '@/components/ItemSheet'
 import { useToast } from '@/components/Toast'
 import { Button, Field } from '@/components/ui'
 import { bundledChecklist, runImport } from '@/household/importChecklist'
 import { useHousehold } from '@/household/HouseholdProvider'
+import { useMemberships } from '@/household/MembershipProvider'
+import { suggestedTimeZone, TimeZoneSelect } from '@/calendar/TimeZoneSelect'
 import { supabase } from '@/lib/supabase'
 import { AuthLayout } from './SignIn'
 
@@ -32,24 +34,29 @@ export function parseInviteCode(input: string): string | null {
 }
 
 export function WelcomePage() {
-  const { state, me, household, createHousehold, reload } = useHousehold()
+  const { state, me, household, createHousehold } = useHousehold()
+  const { memberships, select } = useMemberships()
   const { signOut } = useAuth()
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  // "Add or join a flat" from the menu: people who already have a flat can start another.
+  const adding = params.get('add') === '1' && memberships.length > 0
   const toast = useToast()
-  const ids = { name: useId(), address: useId(), invite: useId() }
+  const ids = { name: useId(), address: useId(), invite: useId(), zone: useId() }
   const rows = useMemo(() => bundledChecklist(), [])
   const roomCount = useMemo(() => new Set(rows.map((r) => r.room)).size, [rows])
 
   const [step, setStep] = useState<'choose' | 'create' | 'join'>('choose')
   const [name, setName] = useState('')
   const [address, setAddress] = useState('')
+  const [zone, setZone] = useState(() => suggestedTimeZone())
   const [withChecklist, setWithChecklist] = useState(true)
   const [invite, setInvite] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   if (state === 'loading') return <FullScreenLoader />
-  if (state === 'ready' && household && !busy) return <Navigate to="/" replace />
+  if (state === 'ready' && household && !busy && !adding) return <Navigate to="/" replace />
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -61,14 +68,18 @@ export function WelcomePage() {
       setBusy(false)
       return setError(res.error)
     }
+    // The suggested zone can be changed later in Settings; a failure here never blocks the flat.
+    const tz = await supabase.rpc('set_household_timezone', { p_household: res.data, p_zone: zone })
+    if (tz.error) toast.error('Your flat was created, but its time zone wasn’t saved. You can set it in Settings.')
     if (withChecklist) {
       const imp = await runImport(res.data, rows)
       if (!imp.ok) toast.error(`Your flat was created, but the checklist import failed: ${imp.error}. You can retry from Settings.`)
       else toast.success(`Imported ${imp.data.itemsCreated} items across ${imp.data.roomsCreated} rooms`)
-      await reload()
     }
     setBusy(false)
-    navigate('/', { replace: true })
+    // Open the new flat (its data loads fresh before Home renders).
+    select(res.data)
+    navigate('/', { replace: true, state: { flat: res.data } })
   }
 
   const join = (e: React.FormEvent) => {
@@ -84,10 +95,11 @@ export function WelcomePage() {
         <>
           <p className="text-ink-2 text-[17px] font-medium">Kia ora{me?.display_name ? `, ${me.display_name}` : ''}</p>
           <h1 className="mt-1 text-[40px] leading-[1.05] font-light tracking-[-0.03em]">
-            Let’s find
+            {adding ? 'Add' : 'Let’s find'}
             <br />
-            <span className="font-extrabold">your flat</span>
+            <span className="font-extrabold">{adding ? 'another flat' : 'your flat'}</span>
           </h1>
+          {adding && <p className="text-ink-2 mt-3">Your other flats stay as they are. Switch between them from the menu.</p>}
           <div className="mt-10 flex flex-col gap-3">
             <button
               onClick={() => setStep('create')}
@@ -110,12 +122,18 @@ export function WelcomePage() {
               <Link2 size={22} aria-hidden />
             </button>
           </div>
-          <button
-            onClick={() => void signOut()}
-            className="text-ink-2 mt-8 inline-flex min-h-11 items-center gap-2 self-center text-[15px] font-medium"
-          >
-            <LogOut size={18} aria-hidden /> Sign out
-          </button>
+          {adding ? (
+            <button onClick={() => navigate(-1)} className="text-ink-2 mt-8 inline-flex min-h-11 items-center gap-2 self-center text-[15px] font-medium">
+              <ArrowLeft size={18} aria-hidden /> Back to your flat
+            </button>
+          ) : (
+            <button
+              onClick={() => void signOut()}
+              className="text-ink-2 mt-8 inline-flex min-h-11 items-center gap-2 self-center text-[15px] font-medium"
+            >
+              <LogOut size={18} aria-hidden /> Sign out
+            </button>
+          )}
         </>
       )}
 
@@ -127,6 +145,9 @@ export function WelcomePage() {
           </Field>
           <Field label="Suburb or address" htmlFor={ids.address} hint="Only visible to your flatmates">
             <input id={ids.address} className="field" value={address} onChange={(e) => setAddress(e.target.value)} maxLength={120} placeholder="Optional" />
+          </Field>
+          <Field label="Time zone" htmlFor={ids.zone} hint="Sets your flat’s calendar week and reminder times. You can change it later.">
+            <TimeZoneSelect id={ids.zone} value={zone} onChange={setZone} />
           </Field>
           <label className="bg-surface-2 flex cursor-pointer items-center justify-between gap-4 rounded-[var(--radius-control)] p-4">
             <span>
@@ -177,6 +198,7 @@ export function WelcomePage() {
 
 export function JoinPage() {
   const { acceptInvite } = useHousehold()
+  const { select } = useMemberships()
   const navigate = useNavigate()
   const toast = useToast()
   const [params] = useSearchParams()
@@ -198,13 +220,16 @@ export function JoinPage() {
     }
   }, [code])
 
-  const accept = async () => {
+  // Joining, or opening a flat you're already in: either way, open exactly the invited flat.
+  // (For an existing member the server returns the flat without using up the invite.)
+  const accept = async (alreadyMember: boolean) => {
     setBusy(true)
     const res = await acceptInvite(code)
     setBusy(false)
     if (!res.ok) return setError(res.error)
-    toast.success('Welcome to the flat!')
-    navigate('/', { replace: true })
+    if (!alreadyMember) toast.success('Welcome to the flat!')
+    select(res.data)
+    navigate('/', { replace: true, state: { flat: res.data } })
   }
 
   const shown = code ? preview : 'invalid'
@@ -238,12 +263,52 @@ export function JoinPage() {
               This flat is already full. Ask a flatmate if they meant to invite you.
             </p>
           ) : (
-            <Button size="lg" block className="mt-10" loading={busy} onClick={shown.is_member ? () => navigate('/') : accept}>
+            <Button size="lg" block className="mt-10" loading={busy} onClick={() => void accept(shown.is_member)}>
               {shown.is_member ? 'You’re already in. Open it' : 'Join the flat'}
             </Button>
           )}
         </>
       )}
+    </AuthLayout>
+  )
+}
+
+/** Several flats and no valid choice yet (or the remembered one is gone): pick one. */
+export function ChooseFlatPage() {
+  const { status, memberships, activeId, select } = useMemberships()
+  const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const next = safeNext(params.get('next'))
+  if (status === 'loading') return <FullScreenLoader />
+  if (status === 'ready' && memberships.length === 0) return <Navigate to="/welcome" replace />
+  const open = (id: string) => {
+    select(id)
+    navigate(next, { replace: true, state: { flat: id } })
+  }
+  return (
+    <AuthLayout>
+      <h1 className="text-display font-bold">Which flat?</h1>
+      <p className="text-ink-2 mt-2">You’re in more than one. You can switch any time from the menu.</p>
+      <ul className="mt-8 flex flex-col gap-3" aria-label="Your flats">
+        {memberships.map((m) => (
+          <li key={m.householdId}>
+            <button
+              type="button"
+              onClick={() => open(m.householdId)}
+              className="pressable bg-surface-2 flex min-h-[72px] w-full items-center justify-between gap-4 rounded-[var(--radius-card)] px-5 text-left"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-[18px] font-bold">{m.name}</span>
+                <span className="text-ink-2 block text-[14px]">{m.role === 'owner' ? 'You set this flat up' : 'Member'}</span>
+              </span>
+              {m.householdId === activeId ? <Check size={20} aria-label="Last opened" /> : <ArrowRight size={20} aria-hidden />}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <Link to="/welcome?add=1" className="pressable text-accent-ink mt-6 inline-flex min-h-11 items-center self-center font-bold">
+        Add or join another flat
+      </Link>
     </AuthLayout>
   )
 }

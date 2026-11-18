@@ -2,7 +2,15 @@ import { expect, test, type Page } from '@playwright/test'
 import { addEvent, hid, kettle, madi, mockFlat, resync, rid, uid } from './fixtures'
 
 type State = Awaited<ReturnType<typeof mockFlat>>
-const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
+/**
+ * A recent moment that is still "today" on the test machine's clock (so a run just after
+ * midnight doesn't push it into "Earlier"). Older items stay older: order is preserved.
+ */
+const minutesAgo = (m: number) => {
+  const now = Date.now()
+  const midnight = new Date(now).setHours(0, 0, 0, 0)
+  return new Date(Math.max(now - m * 60_000, midnight + (120 - m) * 1000)).toISOString()
+}
 const daysAgo = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString()
 
 const bell = (page: Page) => page.getByTestId('notification-bell')

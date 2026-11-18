@@ -5,6 +5,8 @@
 #   3. many simultaneous preference inserts by one member     -> exactly one preference
 #   4. Phase 7: simultaneous adds of one essential, claims of it, and restocks of it
 #   5. Phase 9: simultaneous scheduled reminder runs -> one reminder per task, never two
+#   6. Phase 10: appointment coverage: simultaneous claims, claim vs reschedule, claim vs removal,
+#      and duplicate creates of one draft
 # Uses throwaway users and a throwaway household, and removes them afterwards.
 #
 #   FLATQUEST_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres supabase/tests/coordinator_race.sh
@@ -121,5 +123,66 @@ done
 wait
 check "8 simultaneous reminder runs: none fails" 8 "$(cat "$TMP"/remind.* | grep -c '^ok$' || true)"
 check "8 simultaneous reminder runs: exactly one reminder per overdue task" "1 1" "$(P -c "select string_agg(n::text, ' ') from (select count(nt.id) n from public.household_tasks t left join public.household_events e on e.task_id = t.id and e.type = 'task_reminder' left join public.notifications nt on nt.event_id = e.id where t.household_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' group by t.id) x")"
+
+# ---- Phase 10: shared appointments and coverage
+H=cccccccc-cccc-4ccc-8ccc-cccccccccccc
+APPT=a0a0a0a0-0000-4000-8000-000000000001
+appt_rev() { P -c "select revision from public.calendar_appointments where id = '$1'"; }
+appt_host() { P -c "select coalesce(host_id::text, 'none') from public.calendar_appointments where id = '$1'"; }
+
+dup_gen() { echo "$A|perform public.save_appointment('$APPT', '$H', null, 'Race inspection', null, null, date '2026-12-01', time '10:00', time '11:00', true)"; }
+created="$(run_parallel dupcreate 8 dup_gen)"
+check "8 simultaneous submissions of one draft: none fails" 8 "$created"
+check "8 simultaneous submissions of one draft: exactly one appointment" 1 "$(P -c "select count(*) from public.calendar_appointments where id = '$APPT'")"
+
+REV="$(appt_rev $APPT)"
+claim_cover_gen() { if [ $(( $1 % 2 )) -eq 0 ]; then u=$A; else u=$B; fi
+  echo "$u|perform public.set_appointment_cover('$APPT', $REV, 'claim')"; }
+claimed="$(run_parallel cover 12 claim_cover_gen)"
+check "12 simultaneous offers to be home (two people): only the winner's 6 taps succeed" 6 "$claimed"
+check "12 simultaneous offers: exactly one person is home" 1 "$(P -c "select count(*) from public.calendar_appointments where id = '$APPT' and host_id is not null")"
+
+# Claim racing a reschedule, several times. Whichever commits first wins and the other is
+# refused as stale: either the move lands and nobody is covering, or the volunteer keeps the
+# slot they actually saw and the move must be reviewed. Never a volunteer on an unseen slot.
+broken=0; moves=0; claims=0
+for round in 1 2 3 4 5 6; do
+  host="$(appt_host $APPT)"
+  if [ "$host" != none ]; then
+    as_user "$host" "perform public.set_appointment_cover('$APPT', $(appt_rev $APPT), 'release')" >/dev/null
+  fi
+  REV="$(appt_rev $APPT)"
+  before="$(P -c "select starts_at from public.calendar_appointments where id = '$APPT'")"
+  ( as_user "$B" "perform public.set_appointment_cover('$APPT', $REV, 'claim')" >"$TMP/rc.claim.$round" ) &
+  ( as_user "$A" "perform public.save_appointment('$APPT', '$H', $REV, 'Race inspection', null, null, date '2026-12-01', time '1$round:00', time '1$round:30', true)" >"$TMP/rc.move.$round" ) &
+  wait
+  move="$(cat "$TMP/rc.move.$round")"; claim="$(cat "$TMP/rc.claim.$round")"
+  after="$(P -c "select starts_at from public.calendar_appointments where id = '$APPT'")"
+  if [ "$move" = ok ]; then
+    moves=$((moves + 1))
+    { [ "$(appt_host $APPT)" = none ] && [ "$after" != "$before" ]; } || broken=1
+  else
+    claims=$((claims + 1))
+    { [ "$claim" = ok ] && [ "$(appt_host $APPT)" = "$B" ] && [ "$after" = "$before" ]; } || broken=1
+  fi
+done
+echo "      (claim vs reschedule: move won $moves, claim won $claims)"
+check "claim racing a reschedule (6 rounds): exactly one wins and no one covers a slot they didn't see" 0 "$broken"
+
+# Claim racing removal from the flat: a removed member never ends up covering it.
+REV="$(appt_rev $APPT)"
+( as_user "$B" "perform public.set_appointment_cover('$APPT', $REV, 'claim')" >/dev/null ) &
+( as_user "$A" "perform public.remove_household_member('$H', '$B')" >"$TMP/rm.out" ) &
+wait
+check "claim racing removal: the removal succeeds" ok "$(cat "$TMP/rm.out")"
+check "claim racing removal: the removed member is not covering it" none "$(appt_host $APPT)"
+check "claim racing removal: the removed member can no longer see it" 0 "$(psql "$DB" -X -q -t -A <<SQL 2>/dev/null | tail -n 1
+begin;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"$B","role":"authenticated"}', true);
+select count(*) from public.calendar_appointments;
+commit;
+SQL
+)"
 
 exit $fail
